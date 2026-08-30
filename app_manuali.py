@@ -181,6 +181,7 @@ def safe_parse_date(val):
         return val.date()
     
     val_str = str(val).strip()
+    # Parsing con priorità al formato europeo GG/MM/AAAA
     parsed = pd.to_datetime(val_str, dayfirst=True, errors="coerce")
     if pd.notnull(parsed):
         return parsed.date()
@@ -198,7 +199,6 @@ def auto_update_urgency(dataframe):
                 giorni_rimasti = (d_consegna - today).days
                 if giorni_rimasti <= 14:
                     dataframe.at[idx, "Priorità"] = "🚨 Urgente"
-        # Pulisce vecchi valori di formato
         if str(row.get("Priorità")).strip() == "Urgente":
             dataframe.at[idx, "Priorità"] = "🚨 Urgente"
     return dataframe
@@ -342,10 +342,20 @@ def show_kpi_details(title, sub_df):
             "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur", "Note"
         ]
         cols_to_show = [c for c in display_cols if c in sub_df.columns]
+        
+        dialog_col_config = {
+            "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
+            "Modelli 3D dal": st.column_config.DateColumn("Modelli 3D dal", format="DD/MM/YYYY"),
+            "Scadenza Prevista": st.column_config.DateColumn("Scadenza Prevista", format="DD/MM/YYYY"),
+            "Spedizione Wittur": st.column_config.DateColumn("Spedizione Wittur", format="DD/MM/YYYY"),
+            "Data Chiusura": st.column_config.DateColumn("Data Chiusura", format="DD/MM/YYYY"),
+        }
+        
         st.dataframe(
             sub_df[cols_to_show], 
             use_container_width=True, 
-            hide_index=True
+            hide_index=True,
+            column_config=dialog_col_config
         )
 
 @st.dialog("🔄 Ripristina Backup")
@@ -664,6 +674,7 @@ if not df.empty:
 
         return target_df
 
+    # Configurazione rigida per il formato Data Europeo DD/MM/YYYY
     col_config = {
         "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
         "RDL": st.column_config.TextColumn("RDL", pinned=True),
