@@ -323,12 +323,20 @@ def export_directly_to_target(df_to_export, filename):
         return False, str(e)
 
 def style_zebra(df_to_style):
-    """Funzione per applicare lo sfondo alternato (zebra striping) alle righe della tabella"""
-    def zebra_rows(row):
-        color = '#ffffff' if row.name % 2 == 0 else '#f1f5f9'
-        return [f'background-color: {color}' for _ in row]
-    
-    return df_to_style.reset_index(drop=True).style.apply(zebra_rows, axis=1)
+    """Applica il colore alternato alle righe e colora di rosso le celle con 'Urgente'"""
+    def highlight_urgente(row):
+        styles = []
+        is_even = (row.name % 2 == 0)
+        default_bg = '#ffffff' if is_even else '#f1f5f9'
+        
+        for col, val in row.items():
+            if col == "Priorità" and str(val).strip() == "Urgente":
+                styles.append('background-color: #ef4444; color: #ffffff; font-weight: bold;')
+            else:
+                styles.append(f'background-color: {default_bg}; color: #0f172a;')
+        return styles
+
+    return df_to_style.reset_index(drop=True).style.apply(highlight_urgente, axis=1)
 
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
@@ -700,7 +708,7 @@ if not df.empty:
         "Ore Valutate": st.column_config.NumberColumn("Ore Val.", format="%.1f")
     }
 
-    # --- TAB 1: ATTIVITÀ IN CORSO (Sola Lettura con Zebra Striping) ---
+    # --- TAB 1: ATTIVITÀ IN CORSO ---
     with tab_operativa:
         if not df_attivi.empty:
             df_attivi = process_table_df(df_attivi)
@@ -742,7 +750,7 @@ if not df.empty:
         else:
             st.info("Nessuna attività in corso.")
 
-    # --- TAB 2: ARCHIVIO COMPLETATI (Sola Lettura con Zebra Striping) ---
+    # --- TAB 2: ARCHIVIO COMPLETATI ---
     with tab_completati:
         if not df_completati.empty:
             df_completati = process_table_df(df_completati)
