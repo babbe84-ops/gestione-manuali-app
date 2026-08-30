@@ -323,7 +323,7 @@ def export_directly_to_target(df_to_export, filename):
         return False, str(e)
 
 def style_zebra(df_to_style):
-    """Applica il colore alternato alle righe e colora di rosso le celle con 'Urgente'"""
+    """Applica il colore alternato alle righe e evidenzia in rosso le celle 'Urgente'"""
     def highlight_urgente(row):
         styles = []
         is_even = (row.name % 2 == 0)
@@ -603,63 +603,6 @@ with k4:
 
 st.divider()
 
-# --- AGGIORNAMENTO RAPIDO ---
-if not df.empty:
-    with st.expander("⚡ **Aggiornamento Rapido Stato / Tecnico**", expanded=False):
-        c_sel, c_tipo, c_prio = st.columns([2, 1, 1])
-        c_resp, c_st, c_av, c_btn = st.columns([2, 1, 1, 1])
-        
-        with c_sel:
-            options_list = [f"ID:{i} | {row['Nr. Commessa']} - {row['RDL']} ({row['Attività']})" for i, row in df.iterrows()]
-            commessa_mod = st.selectbox("Seleziona Attività:", options=options_list, key="sel_mod")
-        
-        idx_target = int(commessa_mod.split(" | ")[0].replace("ID:", ""))
-        row_attuale = df.iloc[idx_target]
-        
-        with c_tipo:
-            tipo_curr = row_attuale["Tipo Ordine"] if row_attuale["Tipo Ordine"] in TIPO_ORDINE_OPTIONS else "Confermato"
-            nuovo_tipo = st.selectbox("Tipo Ordine", TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(tipo_curr))
-
-        with c_prio:
-            prio_curr = row_attuale["Priorità"] if row_attuale["Priorità"] in PRIORITA_OPTIONS else "Normale"
-            nuova_prio = st.selectbox("Priorità", PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(prio_curr))
-
-        with c_resp:
-            current_resps = [r.strip() for r in str(row_attuale["Responsabile"]).split(",") if r.strip() in TECNICI]
-            if not current_resps:
-                current_resps = ["Non ancora assegnato"]
-            nuovi_resp = st.multiselect("Tecnici", TECNICI, default=current_resps)
-
-        with c_st:
-            stati_opt = ["Da iniziare", "In corso", "In revisione", "Completato"]
-            st_curr = row_attuale["Stato"] if row_attuale["Stato"] in stati_opt else stati_opt[0]
-            nuovo_stato = st.selectbox("Stato", stati_opt, index=stati_opt.index(st_curr))
-            
-        with c_av:
-            avanz_default = 100 if nuovo_stato == "Completato" else int(row_attuale["Avanzamento (%)"])
-            nuovo_avanzamento = st.slider("Avanzamento %", 0, 100, avanz_default, step=5)
-            
-        with c_btn:
-            st.write("")
-            st.write("")
-            if st.button("✅ Applica", use_container_width=True):
-                st.session_state.main_df.at[idx_target, "Tipo Ordine"] = nuovo_tipo
-                st.session_state.main_df.at[idx_target, "Priorità"] = nuova_prio
-                st.session_state.main_df.at[idx_target, "Responsabile"] = ", ".join(nuovi_resp) if nuovi_resp else "Non ancora assegnato"
-                
-                if nuovo_stato == "Completato" and row_attuale["Stato"] != "Completato":
-                    st.session_state.main_df.at[idx_target, "Data Chiusura"] = date.today()
-                elif nuovo_stato != "Completato":
-                    st.session_state.main_df.at[idx_target, "Data Chiusura"] = None
-                    
-                st.session_state.main_df.at[idx_target, "Stato"] = nuovo_stato
-                st.session_state.main_df.at[idx_target, "Avanzamento (%)"] = 100 if nuovo_stato == "Completato" else nuovo_avanzamento
-                
-                st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
-                save_data(st.session_state.main_df)
-                st.success("Attività aggiornata!")
-                st.rerun()
-
 # --- SCHEDE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
@@ -694,11 +637,11 @@ if not df.empty:
         "RDL": st.column_config.TextColumn("RDL", pinned=True),
         "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
         "Descrizione": st.column_config.TextColumn("Descrizione"),
-        "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS),
-        "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS),
-        "Tipo Ordine": st.column_config.SelectboxColumn("Tipo Ordine", options=TIPO_ORDINE_OPTIONS),
+        "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS, required=True),
+        "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS, required=True),
+        "Tipo Ordine": st.column_config.SelectboxColumn("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, required=True),
         "Responsabile": st.column_config.TextColumn("Responsabile Tecnico"),
-        "Stato": st.column_config.SelectboxColumn("Stato", options=["Da iniziare", "In corso", "In revisione", "Completato"]),
+        "Stato": st.column_config.SelectboxColumn("Stato", options=["Da iniziare", "In corso", "In revisione", "Completato"], required=True),
         "Avanzamento (%)": st.column_config.ProgressColumn("Avanzamento", min_value=0, max_value=100, format="%d%%"),
         "Modelli 3D dal": st.column_config.DateColumn("Modelli 3D dal", format="DD/MM/YYYY"),
         "Scadenza Prevista": st.column_config.DateColumn("Scadenza Prevista", format="DD/MM/YYYY"),
@@ -708,20 +651,57 @@ if not df.empty:
         "Ore Valutate": st.column_config.NumberColumn("Ore Val.", format="%.1f")
     }
 
-    # --- TAB 1: ATTIVITÀ IN CORSO ---
+    def sync_edited_changes(edited_df):
+        for idx, row in edited_df.iterrows():
+            if idx in st.session_state.main_df.index:
+                for c in ALL_COLUMNS:
+                    if c in edited_df.columns:
+                        val = row[c]
+                        if c in DATE_COLUMNS:
+                            st.session_state.main_df.at[idx, c] = safe_parse_date(val)
+                        elif c == "Ore Valutate":
+                            st.session_state.main_df.at[idx, c] = float(pd.to_numeric(val, errors="coerce") or 0.0)
+                        elif c == "Avanzamento (%)":
+                            st.session_state.main_df.at[idx, c] = int(pd.to_numeric(val, errors="coerce") or 0)
+                        elif c == "Stato":
+                            old_st = st.session_state.main_df.at[idx, "Stato"]
+                            st.session_state.main_df.at[idx, c] = str(val)
+                            if val == "Completato" and old_st != "Completato":
+                                st.session_state.main_df.at[idx, "Avanzamento (%)"] = 100
+                                st.session_state.main_df.at[idx, "Data Chiusura"] = date.today()
+                            elif val != "Completato":
+                                st.session_state.main_df.at[idx, "Data Chiusura"] = None
+                        else:
+                            st.session_state.main_df.at[idx, c] = str(val) if pd.notnull(val) else ""
+                            
+        st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
+
+    # --- TAB 1: ATTIVITÀ IN CORSO (EDITABILE) ---
     with tab_operativa:
         if not df_attivi.empty:
             df_attivi = process_table_df(df_attivi)
 
-            st.dataframe(
-                style_zebra(df_attivi[st.session_state.cols_order]),
+            # Applicazione grafica zebra + celle rosse urgenti su data_editor
+            styled_attivi = style_zebra(df_attivi[st.session_state.cols_order])
+
+            edited_attivi = st.data_editor(
+                styled_attivi,
+                num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
-                hide_index=True
+                hide_index=True,
+                key="editor_attivi"
             )
 
-            b1, b2, b3 = st.columns([1, 1.2, 1.3])
+            sync_edited_changes(edited_attivi)
+
+            b1, b2, b3, b4 = st.columns([1.5, 1, 1.2, 1.3])
             with b1:
+                if st.button("💾 Salva Modifiche In Corso", use_container_width=True):
+                    save_data(st.session_state.main_df)
+                    st.toast("✅ Modifiche salvate con successo!")
+                    st.rerun()
+            with b2:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button(
                     label="📥 Scarica Excel",
@@ -730,7 +710,7 @@ if not df.empty:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
-            with b2:
+            with b3:
                 if st.button("📁 Salva in Wittur", key="btn_wittur_attivi", use_container_width=True):
                     fname = f"Attivita_In_Corso_{date.today()}.xlsx"
                     ok, res = export_directly_to_target(df_attivi, fname)
@@ -738,7 +718,7 @@ if not df.empty:
                         st.success(f"Salvato in {TARGET_FOLDER}")
                     else:
                         st.error(f"Errore: {res}")
-            with b3:
+            with b4:
                 html_print_attivi = generate_printable_html(df_attivi, "Tabella Attività In Corso")
                 st.download_button(
                     label="🖨️ Stampa / PDF",
@@ -750,20 +730,31 @@ if not df.empty:
         else:
             st.info("Nessuna attività in corso.")
 
-    # --- TAB 2: ARCHIVIO COMPLETATI ---
+    # --- TAB 2: ARCHIVIO COMPLETATI (EDITABILE) ---
     with tab_completati:
         if not df_completati.empty:
             df_completati = process_table_df(df_completati)
 
-            st.dataframe(
-                style_zebra(df_completati[st.session_state.cols_order]),
+            styled_comp = style_zebra(df_completati[st.session_state.cols_order])
+
+            edited_comp = st.data_editor(
+                styled_comp,
+                num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
-                hide_index=True
+                hide_index=True,
+                key="editor_completati"
             )
 
-            c1, c2, c3 = st.columns([1, 1.2, 1.3])
+            sync_edited_changes(edited_comp)
+
+            c1, c2, c3, c4 = st.columns([1.5, 1, 1.2, 1.3])
             with c1:
+                if st.button("💾 Salva Modifiche Archivio", use_container_width=True):
+                    save_data(st.session_state.main_df)
+                    st.toast("✅ Archivio salvato con successo!")
+                    st.rerun()
+            with c2:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button(
                     label="📥 Scarica Excel",
@@ -772,7 +763,7 @@ if not df.empty:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
-            with c2:
+            with c3:
                 if st.button("📁 Salva in Wittur", key="btn_wittur_comp", use_container_width=True):
                     fname = f"Archivio_Completati_{date.today()}.xlsx"
                     ok, res = export_directly_to_target(df_completati, fname)
@@ -780,7 +771,7 @@ if not df.empty:
                         st.success(f"Salvato in {TARGET_FOLDER}")
                     else:
                         st.error(f"Errore: {res}")
-            with c3:
+            with c4:
                 html_print_comp = generate_printable_html(df_completati, "Tabella Attività Completate")
                 st.download_button(
                     label="🖨️ Stampa / PDF",
