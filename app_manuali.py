@@ -189,7 +189,7 @@ if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
 def process_and_save_editor(key_editor, current_view_df):
-    """Elabora le modifiche pendenti nell'editor e scrive fisicamente su file solo dopo il click su Salva"""
+    """Mappatura esatta tra gli indici dell'editor visivo e il dataframe su disco CSV"""
     editor_state = st.session_state.get(key_editor, {})
     main_df = st.session_state.main_df.copy()
     has_changes = False
@@ -415,7 +415,7 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
             for idx, row in progetti_urgenti.iterrows():
                 st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} ({row['Responsabile']})")
 
-# --- KPI METRICS CON PULSANTI DI APERTURA DETTAGLIO ---
+# --- KPI METRICS ---
 k1, k2, k3, k4 = st.columns(4)
 
 df_totale = df.copy() if not df.empty else pd.DataFrame()
@@ -539,7 +539,7 @@ if not df.empty:
                     if saved:
                         st.toast("✅ Modifiche salvate sul database CSV!", icon="💾")
                     else:
-                        st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
+                        st.toast("ℹ️ Nessuna modifica rilevata.", icon="ℹ️")
                     st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
@@ -575,7 +575,7 @@ if not df.empty:
                     if saved:
                         st.toast("✅ Archivio salvato sul database CSV!", icon="💾")
                     else:
-                        st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
+                        st.toast("ℹ️ Nessuna modifica rilevata.", icon="ℹ️")
                     st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
