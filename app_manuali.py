@@ -185,24 +185,20 @@ def save_data_to_file(df_to_save):
         df_disk[dcol] = df_disk[dcol].apply(lambda x: x.strftime('%Y-%m-%d') if isinstance(x, (date, datetime)) else "")
     df_disk.to_csv(DB_FILE, index=False)
 
-# Caricamento iniziale nello stato
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
-# Callback per il salvataggio automatico ed istantaneo ad ogni modifica in tabella
-def on_editor_change(key_editor, current_view_df):
+def process_and_save_editor(key_editor, current_view_df):
     editor_state = st.session_state.get(key_editor, {})
     main_df = st.session_state.main_df.copy()
-    has_changes = False
 
-    # 1. Gestione cancellazione righe
+    # 1. Cancellazione righe
     deleted_positions = editor_state.get("deleted_rows", [])
     if deleted_positions:
         indices_to_drop = current_view_df.iloc[deleted_positions].index
         main_df = main_df.drop(index=indices_to_drop, errors="ignore")
-        has_changes = True
 
-    # 2. Gestione modifica celle
+    # 2. Modifica celle
     edited_rows = editor_state.get("edited_rows", {})
     if edited_rows:
         for pos_str, changes in edited_rows.items():
@@ -226,9 +222,8 @@ def on_editor_change(key_editor, current_view_df):
                             main_df.at[orig_idx, "Data Chiusura"] = None
                     else:
                         main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
-                has_changes = True
 
-    # 3. Gestione nuove righe
+    # 3. Nuove righe
     added_rows = editor_state.get("added_rows", [])
     if added_rows:
         new_records = []
@@ -236,12 +231,10 @@ def on_editor_change(key_editor, current_view_df):
             rec = {col: a_row.get(col, "") for col in ALL_COLUMNS}
             new_records.append(rec)
         main_df = pd.concat([main_df, pd.DataFrame(new_records)], ignore_index=True)
-        has_changes = True
 
-    if has_changes:
-        main_df = auto_update_urgency(main_df)
-        st.session_state.main_df = main_df
-        save_data_to_file(main_df)
+    main_df = auto_update_urgency(main_df)
+    st.session_state.main_df = main_df
+    save_data_to_file(main_df)
 
 def generate_printable_html(df_to_print, title):
     cols = ["Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur"]
@@ -421,7 +414,7 @@ if not df.empty:
             sort_order = st.radio("Ordine:", options=["Crescente ⬆️", "Decrescente ⬇️"], horizontal=True)
             st.session_state.sort_ascending = (sort_order == "Crescente ⬆️")
 
-# --- TABELLES PRINCIPALI ---
+# --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
 col_config = {
@@ -479,12 +472,15 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_attivi",
-                on_change=on_editor_change,
-                args=("editor_attivi", view_attivi)
+                key="editor_attivi"
             )
 
-            b1, b2, b3 = st.columns([1, 1.2, 1.3])
+            b0, b1, b2, b3 = st.columns([1.5, 1, 1.2, 1.3])
+            with b0:
+                if st.button("💾 Salva Modifiche", key="btn_save_attivi", use_container_width=True):
+                    process_and_save_editor("editor_attivi", view_attivi)
+                    st.toast("✅ Modifiche salvate con successo!", icon="💾")
+                    st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button("📥 Scarica Excel", data=excel_data_attivi, file_name=f"Attivita_In_Corso_{date.today()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
@@ -509,12 +505,15 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_completati",
-                on_change=on_editor_change,
-                args=("editor_completati", view_comp)
+                key="editor_completati"
             )
 
-            c1, c2, c3 = st.columns([1, 1.2, 1.3])
+            c0, c1, c2, c3 = st.columns([1.5, 1, 1.2, 1.3])
+            with c0:
+                if st.button("💾 Salva Modifiche Archivio", key="btn_save_comp", use_container_width=True):
+                    process_and_save_editor("editor_completati", view_comp)
+                    st.toast("✅ Archivio salvato con successo!", icon="💾")
+                    st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button("📥 Scarica Excel", data=excel_data_comp, file_name=f"Archivio_Completati_{date.today()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
