@@ -654,6 +654,7 @@ if not df.empty:
     df_completati = df_base[df_base["Stato"] == "Completato"].copy()
 
     def process_table_df(target_df):
+        target_df = target_df.copy()
         for c in ALL_COLUMNS:
             if c not in ["Ore Valutate", "Avanzamento (%)"] + DATE_COLUMNS:
                 target_df[c] = target_df[c].fillna("").astype(str)
@@ -674,6 +675,7 @@ if not df.empty:
         return target_df
 
     col_config = {
+        "🗑️ Elimina": st.column_config.CheckboxColumn("🗑️ Elimina", default=False),
         "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
         "RDL": st.column_config.TextColumn("RDL", pinned=True),
         "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
@@ -692,65 +694,54 @@ if not df.empty:
         "Ore Valutate": st.column_config.NumberColumn("Ore Val.", format="%.1f")
     }
 
-    def sync_and_save_editor_state(view_df, editor_key):
-        """Applica immediatamente le modifiche al dataframe principale e le salva su disk CSV"""
-        editor_state = st.session_state.get(editor_key, {})
-        has_changes = False
-        
-        # 1. Cancellazione righe
-        deleted_indices = editor_state.get("deleted_rows", [])
-        if deleted_indices:
-            original_indices_to_delete = view_df.iloc[deleted_indices].index
-            st.session_state.main_df = st.session_state.main_df.drop(original_indices_to_delete)
-            has_changes = True
+    def sync_and_save_editor_state(edited_df):
+        """Prende la tabella editata e la salva direttamente su disco garantendo la persistenza"""
+        df_main = st.session_state.main_df.copy()
 
-        # 2. Modifica celle
-        edited_rows = editor_state.get("edited_rows", {})
-        if edited_rows:
-            for row_pos, col_dict in edited_rows.items():
-                orig_idx = view_df.index[row_pos]
-                if orig_idx in st.session_state.main_df.index:
-                    for col_name, new_val in col_dict.items():
-                        if col_name in DATE_COLUMNS:
-                            st.session_state.main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
-                        elif col_name == "Ore Valutate":
-                            st.session_state.main_df.at[orig_idx, col_name] = float(pd.to_numeric(new_val, errors="coerce") or 0.0)
-                        elif col_name == "Avanzamento (%)":
-                            st.session_state.main_df.at[orig_idx, col_name] = int(pd.to_numeric(new_val, errors="coerce") or 0)
-                        elif col_name == "Stato":
-                            old_st = st.session_state.main_df.at[orig_idx, "Stato"]
-                            st.session_state.main_df.at[orig_idx, col_name] = str(new_val)
-                            if new_val == "Completato" and old_st != "Completato":
-                                st.session_state.main_df.at[orig_idx, "Avanzamento (%)"] = 100
-                                st.session_state.main_df.at[orig_idx, "Data Chiusura"] = date.today()
-                            elif new_val != "Completato":
-                                st.session_state.main_df.at[orig_idx, "Data Chiusura"] = None
+        # Rimuovi righe segnate per l'eliminazione
+        if "🗑️ Elimina" in edited_df.columns:
+            to_delete_indices = edited_df[edited_df["🗑️ Elimina"] == True].index
+            df_main = df_main.drop(index=to_delete_indices, errors="ignore")
+            edited_df = edited_df[edited_df["🗑️ Elimina"] != True].drop(columns=["🗑️ Elimina"])
+
+        # Aggiorna tutte le celle modificate sul dataframe principale
+        for idx in edited_df.index:
+            if idx in df_main.index:
+                for col in ALL_COLUMNS:
+                    if col in edited_df.columns:
+                        val = edited_df.at[idx, col]
+                        if col in DATE_COLUMNS:
+                            df_main.at[idx, col] = safe_parse_date(val)
+                        elif col == "Ore Valutate":
+                            df_main.at[idx, col] = float(pd.to_numeric(val, errors="coerce") or 0.0)
+                        elif col == "Avanzamento (%)":
+                            df_main.at[idx, col] = int(pd.to_numeric(val, errors="coerce") or 0)
+                        elif col == "Stato":
+                            old_st = df_main.at[idx, "Stato"]
+                            df_main.at[idx, col] = str(val)
+                            if val == "Completato" and old_st != "Completato":
+                                df_main.at[idx, "Avanzamento (%)"] = 100
+                                df_main.at[idx, "Data Chiusura"] = date.today()
+                            elif val != "Completato":
+                                df_main.at[idx, "Data Chiusura"] = None
                         else:
-                            st.session_state.main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
-                    has_changes = True
+                            df_main.at[idx, col] = str(val) if pd.notnull(val) else ""
 
-        # 3. Nuove righe aggiunte
-        added_rows = editor_state.get("added_rows", [])
-        if added_rows:
-            new_df_rows = []
-            for a_row in added_rows:
-                row_dict = {col: a_row.get(col, "") for col in ALL_COLUMNS}
-                new_df_rows.append(row_dict)
-            st.session_state.main_df = pd.concat([st.session_state.main_df, pd.DataFrame(new_df_rows)], ignore_index=True)
-            has_changes = True
-
-        # Aggiorna priorità e salva sempre su file CSV per persistere le modifiche
-        st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
-        save_data(st.session_state.main_df)
+        df_main = auto_update_urgency(df_main)
+        st.session_state.main_df = df_main
+        save_data(df_main)
 
     # --- TAB 1: ATTIVITÀ IN CORSO ---
     with tab_operativa:
         if not df_attivi.empty:
             df_attivi = process_table_df(df_attivi)
+            
+            # Aggiungi colonna per cancellazione
+            df_attivi_edit = df_attivi[st.session_state.cols_order].copy()
+            df_attivi_edit.insert(0, "🗑️ Elimina", False)
 
-            st.data_editor(
-                df_attivi[st.session_state.cols_order],
-                num_rows="dynamic",
+            edited_attivi = st.data_editor(
+                df_attivi_edit,
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
@@ -760,8 +751,9 @@ if not df.empty:
             b1, b2, b3, b4 = st.columns([1.5, 1, 1.2, 1.3])
             with b1:
                 if st.button("💾 Salva Modifiche In Corso", key="btn_save_attivi", use_container_width=True):
-                    sync_and_save_editor_state(df_attivi, "editor_attivi")
+                    sync_and_save_editor_state(edited_attivi)
                     st.success("✅ Modifiche salvate con successo sul database CSV!")
+                    st.rerun()
             with b2:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button(
@@ -796,9 +788,11 @@ if not df.empty:
         if not df_completati.empty:
             df_completati = process_table_df(df_completati)
 
-            st.data_editor(
-                df_completati[st.session_state.cols_order],
-                num_rows="dynamic",
+            df_comp_edit = df_completati[st.session_state.cols_order].copy()
+            df_comp_edit.insert(0, "🗑️ Elimina", False)
+
+            edited_comp = st.data_editor(
+                df_comp_edit,
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
@@ -808,8 +802,9 @@ if not df.empty:
             c1, c2, c3, c4 = st.columns([1.5, 1, 1.2, 1.3])
             with c1:
                 if st.button("💾 Salva Modifiche Archivio", key="btn_save_comp", use_container_width=True):
-                    sync_and_save_editor_state(df_completati, "editor_completati")
+                    sync_and_save_editor_state(edited_comp)
                     st.success("✅ Archivio salvato con successo sul database CSV!")
+                    st.rerun()
             with c2:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button(
