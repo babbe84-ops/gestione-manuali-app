@@ -189,14 +189,17 @@ if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
 def process_and_save_editor(key_editor, current_view_df):
+    """Elabora le modifiche pendenti nell'editor e scrive fisicamente su file solo dopo il click su Salva"""
     editor_state = st.session_state.get(key_editor, {})
     main_df = st.session_state.main_df.copy()
+    has_changes = False
 
     # 1. Cancellazione righe
     deleted_positions = editor_state.get("deleted_rows", [])
     if deleted_positions:
         indices_to_drop = current_view_df.iloc[deleted_positions].index
         main_df = main_df.drop(index=indices_to_drop, errors="ignore")
+        has_changes = True
 
     # 2. Modifica celle
     edited_rows = editor_state.get("edited_rows", {})
@@ -222,6 +225,7 @@ def process_and_save_editor(key_editor, current_view_df):
                             main_df.at[orig_idx, "Data Chiusura"] = None
                     else:
                         main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
+                has_changes = True
 
     # 3. Nuove righe
     added_rows = editor_state.get("added_rows", [])
@@ -231,10 +235,14 @@ def process_and_save_editor(key_editor, current_view_df):
             rec = {col: a_row.get(col, "") for col in ALL_COLUMNS}
             new_records.append(rec)
         main_df = pd.concat([main_df, pd.DataFrame(new_records)], ignore_index=True)
+        has_changes = True
 
-    main_df = auto_update_urgency(main_df)
-    st.session_state.main_df = main_df
-    save_data_to_file(main_df)
+    if has_changes:
+        main_df = auto_update_urgency(main_df)
+        st.session_state.main_df = main_df
+        save_data_to_file(main_df)
+        return True
+    return False
 
 @st.dialog("📊 Dettaglio Attività", width="large")
 def show_kpi_details(title, sub_df):
@@ -527,8 +535,11 @@ if not df.empty:
             b0, b1, b2, b3 = st.columns([1.5, 1, 1.2, 1.3])
             with b0:
                 if st.button("💾 Salva Modifiche", key="btn_save_attivi", use_container_width=True):
-                    process_and_save_editor("editor_attivi", view_attivi)
-                    st.toast("✅ Modifiche salvate con successo!", icon="💾")
+                    saved = process_and_save_editor("editor_attivi", view_attivi)
+                    if saved:
+                        st.toast("✅ Modifiche salvate sul database CSV!", icon="💾")
+                    else:
+                        st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
                     st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
@@ -560,8 +571,11 @@ if not df.empty:
             c0, c1, c2, c3 = st.columns([1.5, 1, 1.2, 1.3])
             with c0:
                 if st.button("💾 Salva Modifiche Archivio", key="btn_save_comp", use_container_width=True):
-                    process_and_save_editor("editor_completati", view_comp)
-                    st.toast("✅ Archivio salvato con successo!", icon="💾")
+                    saved = process_and_save_editor("editor_completati", view_comp)
+                    if saved:
+                        st.toast("✅ Archivio salvato sul database CSV!", icon="💾")
+                    else:
+                        st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
                     st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
