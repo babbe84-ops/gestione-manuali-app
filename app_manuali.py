@@ -603,12 +603,54 @@ with k4:
 
 st.divider()
 
+# --- FILTRI & ORDINAMENTO ---
+if not df.empty:
+    with st.expander("🔍 **Filtri & Ordinamento Tabelle**", expanded=True):
+        f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1, 1, 1])
+        with f_col1:
+            search_query = st.text_input("🔍 Cerca testo (Commessa, RDL, Note...):", "")
+        with f_col2:
+            filtro_tecnico = st.multiselect("Tecnico:", options=TECNICI)
+        with f_col3:
+            filtro_attivita = st.multiselect("Attività:", options=ATTIVITA_OPTIONS)
+        with f_col4:
+            filtro_prio = st.multiselect("Priorità:", options=PRIORITA_OPTIONS)
+
+        available_sort_cols = [c for c in DEFAULT_ORDER if c in st.session_state.cols_order]
+        if "Nuova consegna prevista" in available_sort_cols:
+            available_sort_cols.remove("Nuova consegna prevista")
+            available_sort_cols.insert(0, "Nuova consegna prevista")
+
+        s_col1, s_col2 = st.columns([3, 1])
+        with s_col1:
+            sort_col_selected = st.selectbox(
+                "Ordina per colonna:",
+                options=available_sort_cols,
+                index=available_sort_cols.index(st.session_state.sort_column) if st.session_state.sort_column in available_sort_cols else 0
+            )
+            st.session_state.sort_column = sort_col_selected
+        with s_col2:
+            sort_order = st.radio("Ordine:", options=["Crescente ⬆️", "Decrescente ⬇️"], horizontal=True)
+            st.session_state.sort_ascending = (sort_order == "Crescente ⬆️")
+
 # --- SCHEDE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
 if not df.empty:
     df_base = df.copy()
     
+    # Applica i filtri impostati
+    if search_query:
+        mask = df_base.astype(str).apply(lambda row: row.str.contains(search_query, case=False, na=False)).any(axis=1)
+        df_base = df_base[mask]
+    if filtro_tecnico:
+        pattern = "|".join([rf"\b{tec}\b" for tec in filtro_tecnico])
+        df_base = df_base[df_base["Responsabile"].astype(str).str.contains(pattern, case=False, na=False)]
+    if filtro_attivita:
+        df_base = df_base[df_base["Attività"].isin(filtro_attivita)]
+    if filtro_prio:
+        df_base = df_base[df_base["Priorità"].isin(filtro_prio)]
+
     df_attivi = df_base[df_base["Stato"] != "Completato"].copy()
     df_completati = df_base[df_base["Stato"] == "Completato"].copy()
 
@@ -681,7 +723,6 @@ if not df.empty:
         if not df_attivi.empty:
             df_attivi = process_table_df(df_attivi)
 
-            # Applicazione grafica zebra + celle rosse urgenti su data_editor
             styled_attivi = style_zebra(df_attivi[st.session_state.cols_order])
 
             edited_attivi = st.data_editor(
@@ -728,7 +769,7 @@ if not df.empty:
                     use_container_width=True
                 )
         else:
-            st.info("Nessuna attività in corso.")
+            st.info("Nessuna attività in corso con i filtri selezionati.")
 
     # --- TAB 2: ARCHIVIO COMPLETATI (EDITABILE) ---
     with tab_completati:
@@ -781,7 +822,7 @@ if not df.empty:
                     use_container_width=True
                 )
         else:
-            st.info("Nessuna attività completata.")
+            st.info("Nessuna attività completata con i filtri selezionati.")
 
 # --- TAB 3: REPORTISTICA & ANALYTICS ---
 with tab_reports:
