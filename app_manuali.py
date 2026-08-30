@@ -181,7 +181,6 @@ def safe_parse_date(val):
         return val.date()
     
     val_str = str(val).strip()
-    # Parsing con priorità al formato europeo GG/MM/AAAA
     parsed = pd.to_datetime(val_str, dayfirst=True, errors="coerce")
     if pd.notnull(parsed):
         return parsed.date()
@@ -199,7 +198,7 @@ def auto_update_urgency(dataframe):
                 giorni_rimasti = (d_consegna - today).days
                 if giorni_rimasti <= 14:
                     dataframe.at[idx, "Priorità"] = "🚨 Urgente"
-        if str(row.get("Priorità")).strip() == "Urgente":
+        if str(row.get("Priorità")).strip() in ["Urgente", "🚨 Urgente"]:
             dataframe.at[idx, "Priorità"] = "🚨 Urgente"
     return dataframe
 
@@ -674,7 +673,6 @@ if not df.empty:
 
         return target_df
 
-    # Configurazione rigida per il formato Data Europeo DD/MM/YYYY
     col_config = {
         "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
         "RDL": st.column_config.TextColumn("RDL", pinned=True),
@@ -694,7 +692,9 @@ if not df.empty:
         "Ore Valutate": st.column_config.NumberColumn("Ore Val.", format="%.1f")
     }
 
-    def process_editor_changes(view_df, editor_state):
+    def sync_and_save_editor_state(view_df, editor_key):
+        """Applica immediatamente le modifiche al dataframe principale e le salva su disk CSV"""
+        editor_state = st.session_state.get(editor_key, {})
         has_changes = False
         
         # 1. Cancellazione righe
@@ -729,7 +729,7 @@ if not df.empty:
                             st.session_state.main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
                     has_changes = True
 
-        # 3. Nuove righe
+        # 3. Nuove righe aggiunte
         added_rows = editor_state.get("added_rows", [])
         if added_rows:
             new_df_rows = []
@@ -739,9 +739,9 @@ if not df.empty:
             st.session_state.main_df = pd.concat([st.session_state.main_df, pd.DataFrame(new_df_rows)], ignore_index=True)
             has_changes = True
 
-        if has_changes:
-            st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
-            save_data(st.session_state.main_df)
+        # Aggiorna priorità e salva sempre su file CSV per persistere le modifiche
+        st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
+        save_data(st.session_state.main_df)
 
     # --- TAB 1: ATTIVITÀ IN CORSO ---
     with tab_operativa:
@@ -757,15 +757,11 @@ if not df.empty:
                 key="editor_attivi"
             )
 
-            if "editor_attivi" in st.session_state:
-                process_editor_changes(df_attivi, st.session_state["editor_attivi"])
-
             b1, b2, b3, b4 = st.columns([1.5, 1, 1.2, 1.3])
             with b1:
-                if st.button("💾 Salva Modifiche In Corso", use_container_width=True):
-                    save_data(st.session_state.main_df)
-                    st.toast("✅ Modifiche salvate con successo!")
-                    st.rerun()
+                if st.button("💾 Salva Modifiche In Corso", key="btn_save_attivi", use_container_width=True):
+                    sync_and_save_editor_state(df_attivi, "editor_attivi")
+                    st.success("✅ Modifiche salvate con successo sul database CSV!")
             with b2:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button(
@@ -809,15 +805,11 @@ if not df.empty:
                 key="editor_completati"
             )
 
-            if "editor_completati" in st.session_state:
-                process_editor_changes(df_completati, st.session_state["editor_completati"])
-
             c1, c2, c3, c4 = st.columns([1.5, 1, 1.2, 1.3])
             with c1:
-                if st.button("💾 Salva Modifiche Archivio", use_container_width=True):
-                    save_data(st.session_state.main_df)
-                    st.toast("✅ Archivio salvato con successo!")
-                    st.rerun()
+                if st.button("💾 Salva Modifiche Archivio", key="btn_save_comp", use_container_width=True):
+                    sync_and_save_editor_state(df_completati, "editor_completati")
+                    st.success("✅ Archivio salvato con successo sul database CSV!")
             with c2:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button(
