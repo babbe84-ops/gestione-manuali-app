@@ -15,69 +15,76 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STILING CSS AVANZATO E RESPONSIVE MOBILE ---
+# --- STYLING CSS CLEAN & BUTTONS HI-VIS ---
 st.markdown("""
 <style>
-    /* Tipografia e sfondo generale */
+    /* Sfondo e font principale */
     .stApp {
-        background-color: #f8fafc;
+        background-color: #f1f5f9;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* Header e Titoli */
+    /* Header Pulito */
     .main-title {
         font-size: 1.8rem;
         font-weight: 800;
         color: #0f172a;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.1rem;
     }
     .sub-title {
         font-size: 0.95rem;
-        color: #64748b;
-        margin-bottom: 1.5rem;
+        color: #475569;
+        margin-bottom: 1.2rem;
     }
 
-    /* Card KPI / Statistiche */
-    div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 12px 16px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    }
-
-    /* Ottimizzazione Bottoni */
+    /* Pulsanti ad alta visibilità e ben cliccabili */
     .stButton > button {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        border: none !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
-        transition: all 0.2s ease-in-out;
+        font-size: 0.95rem !important;
+        padding: 0.55rem 1rem !important;
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
+        transition: all 0.15s ease-in-out !important;
     }
-    
-    /* Contenitore Form ed Editor */
-    div[data-testid="stForm"] {
-        background-color: #ffffff;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        padding: 1rem;
+    .stButton > button:hover {
+        background-color: #1d4ed8 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3) !important;
+    }
+    .stButton > button:active {
+        transform: translateY(0px);
     }
 
-    /* Media query per dispositivi Mobili (< 768px) */
+    /* Bottoni secondari / Download */
+    .stDownloadButton > button {
+        background-color: #0f766e !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        border: none !important;
+    }
+    .stDownloadButton > button:hover {
+        background-color: #115e59 !important;
+    }
+
+    /* Card KPI riassuntive */
+    div[data-testid="stMetric"] {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 12px 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    /* Ottimizzazione mobile per dataframe */
     @media (max-width: 768px) {
-        .main-title {
-            font-size: 1.4rem;
-        }
-        .sub-title {
-            font-size: 0.85rem;
-        }
-        /* Garantisce lo scrolling della tabella su schermi stretti */
-        div[data-testid="stDataFrame"] {
-            width: 100% !important;
-            overflow-x: auto !important;
-        }
-        /* Riduce i margini laterali su smartphone */
+        .main-title { font-size: 1.4rem; }
         .block-container {
-            padding-left: 0.8rem !important;
-            padding-right: 0.8rem !important;
+            padding-left: 0.6rem !important;
+            padding-right: 0.6rem !important;
             padding-top: 1rem !important;
         }
     }
@@ -358,7 +365,6 @@ def show_kpi_details(title, sub_df):
 @st.dialog("🔄 Ripristina Backup")
 def restore_backup_dialog():
     backup_files = sorted(glob.glob(os.path.join(BACKUP_DIR, "manuali_progetti_db_*.csv")), reverse=True)
-    
     if not backup_files:
         st.info("Nessun backup disponibile.")
         return
@@ -427,7 +433,7 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
     cartella = st.text_input("Percorso Cartella Locale")
     note = st.text_area("Note")
     
-    submitted = st.form_submit_button("Salva Commessa")
+    submitted = st.form_submit_button("Salva Commessa", use_container_width=True)
     
     if submitted and codice and rdl_val:
         if not attivita_selezionate:
@@ -472,7 +478,7 @@ st.sidebar.header("📥 Importa / Merge Excel")
 uploaded_file = st.sidebar.file_uploader("Carica Excel (.xlsx / .xls)", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
-    if st.sidebar.button("Procedi Merge"):
+    if st.sidebar.button("Procedi Merge", use_container_width=True):
         try:
             excel_df = pd.read_excel(uploaded_file, header=0, dtype=str)
             excel_df.columns = [str(c).strip() for c in excel_df.columns]
@@ -597,107 +603,13 @@ with k4:
 
 st.divider()
 
-# --- AGGIORNAMENTO RAPIDO RESPONSIVE ---
+# --- SCHEDE PRINCIPALI (Tabelle + Reportistica) ---
+tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
+
+# --- TAB 1 & 2 OPERATIVE ---
 if not df.empty:
-    with st.expander("⚡ **Aggiornamento Rapido Stato / Tecnico**", expanded=False):
-        c_sel, c_tipo, c_prio = st.columns([2, 1, 1])
-        c_resp, c_st, c_av, c_btn = st.columns([2, 1, 1, 1])
-        
-        with c_sel:
-            options_list = [f"ID:{i} | {row['Nr. Commessa']} - {row['RDL']} ({row['Attività']})" for i, row in df.iterrows()]
-            commessa_mod = st.selectbox("Seleziona Attività:", options=options_list, key="sel_mod")
-        
-        idx_target = int(commessa_mod.split(" | ")[0].replace("ID:", ""))
-        row_attuale = df.iloc[idx_target]
-        
-        with c_tipo:
-            tipo_curr = row_attuale["Tipo Ordine"] if row_attuale["Tipo Ordine"] in TIPO_ORDINE_OPTIONS else "Confermato"
-            nuovo_tipo = st.selectbox("Tipo Ordine", TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(tipo_curr))
-
-        with c_prio:
-            prio_curr = row_attuale["Priorità"] if row_attuale["Priorità"] in PRIORITA_OPTIONS else "Normale"
-            nuova_prio = st.selectbox("Priorità", PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(prio_curr))
-
-        with c_resp:
-            current_resps = [r.strip() for r in str(row_attuale["Responsabile"]).split(",") if r.strip() in TECNICI]
-            if not current_resps:
-                current_resps = ["Non ancora assegnato"]
-            nuovi_resp = st.multiselect("Tecnici", TECNICI, default=current_resps)
-
-        with c_st:
-            stati_opt = ["Da iniziare", "In corso", "In revisione", "Completato"]
-            st_curr = row_attuale["Stato"] if row_attuale["Stato"] in stati_opt else stati_opt[0]
-            nuovo_stato = st.selectbox("Stato", stati_opt, index=stati_opt.index(st_curr))
-            
-        with c_av:
-            avanz_default = 100 if nuovo_stato == "Completato" else int(row_attuale["Avanzamento (%)"])
-            nuovo_avanzamento = st.slider("Avanzamento %", 0, 100, avanz_default, step=5)
-            
-        with c_btn:
-            st.write("")
-            st.write("")
-            if st.button("✅ Applica", use_container_width=True):
-                st.session_state.main_df.at[idx_target, "Tipo Ordine"] = nuovo_tipo
-                st.session_state.main_df.at[idx_target, "Priorità"] = nuova_prio
-                st.session_state.main_df.at[idx_target, "Responsabile"] = ", ".join(nuovi_resp) if nuovi_resp else "Non ancora assegnato"
-                
-                if nuovo_stato == "Completato" and row_attuale["Stato"] != "Completato":
-                    st.session_state.main_df.at[idx_target, "Data Chiusura"] = date.today()
-                elif nuovo_stato != "Completato":
-                    st.session_state.main_df.at[idx_target, "Data Chiusura"] = None
-                    
-                st.session_state.main_df.at[idx_target, "Stato"] = nuovo_stato
-                st.session_state.main_df.at[idx_target, "Avanzamento (%)"] = 100 if nuovo_stato == "Completato" else nuovo_avanzamento
-                
-                st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
-                save_data(st.session_state.main_df)
-                st.success("Attività aggiornata!")
-                st.rerun()
-
-# --- TABELLE OPERATIVE ---
-if not df.empty:
-    st.subheader("🔍 Filtri & Ricerca")
-    
-    f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1, 1, 1])
-    with f_col1:
-        search_query = st.text_input("🔍 Cerca testo...", "")
-    with f_col2:
-        filtro_tecnico = st.multiselect("Tecnico:", options=TECNICI)
-    with f_col3:
-        filtro_attivita = st.multiselect("Attività:", options=ATTIVITA_OPTIONS)
-    with f_col4:
-        filtro_prio = st.multiselect("Priorità:", options=PRIORITA_OPTIONS)
-
-    available_sort_cols = [c for c in DEFAULT_ORDER if c in st.session_state.cols_order and c != "Apri Cartella"]
-    if "Nuova consegna prevista" in available_sort_cols:
-        available_sort_cols.remove("Nuova consegna prevista")
-        available_sort_cols.insert(0, "Nuova consegna prevista")
-
-    s_col1, s_col2 = st.columns([3, 1])
-    with s_col1:
-        sort_col_selected = st.selectbox(
-            "Ordina per:",
-            options=available_sort_cols,
-            index=available_sort_cols.index(st.session_state.sort_column) if st.session_state.sort_column in available_sort_cols else 0
-        )
-        st.session_state.sort_column = sort_col_selected
-    with s_col2:
-        sort_order = st.radio("Verso:", options=["Crescente ⬆️", "Decrescente ⬇️"], horizontal=True)
-        st.session_state.sort_ascending = (sort_order == "Crescente ⬆️")
-    
     df_base = df.copy()
     
-    if search_query:
-        mask = df_base.astype(str).apply(lambda row: row.str.contains(search_query, case=False, na=False)).any(axis=1)
-        df_base = df_base[mask]
-    if filtro_tecnico:
-        pattern = "|".join([rf"\b{tec}\b" for tec in filtro_tecnico])
-        df_base = df_base[df_base["Responsabile"].astype(str).str.contains(pattern, case=False, na=False)]
-    if filtro_attivita:
-        df_base = df_base[df_base["Attività"].isin(filtro_attivita)]
-    if filtro_prio:
-        df_base = df_base[df_base["Priorità"].isin(filtro_prio)]
-
     df_attivi = df_base[df_base["Stato"] != "Completato"].copy()
     df_completati = df_base[df_base["Stato"] == "Completato"].copy()
 
@@ -723,7 +635,6 @@ if not df.empty:
 
         return target_df
 
-    # Configurazione grafica avanzata colonne
     col_config = {
         "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
         "RDL": st.column_config.TextColumn("RDL", pinned=True),
@@ -761,10 +672,7 @@ if not df.empty:
                             
         st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
 
-    # SCHEDE PRINCIPALI TABELLE
-    tab1, tab2 = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati"])
-
-    with tab1:
+    with tab_operativa:
         if not df_attivi.empty:
             df_attivi = process_table_df(df_attivi)
 
@@ -820,7 +728,7 @@ if not df.empty:
         else:
             st.info("Nessuna attività in corso.")
 
-    with tab2:
+    with tab_completati:
         if not df_completati.empty:
             df_completati = process_table_df(df_completati)
 
@@ -876,5 +784,57 @@ if not df.empty:
         else:
             st.info("Nessuna attività completata.")
 
-else:
-    st.info("Nessuna commessa presente. Utilizza il menu a sinistra per aggiungere nuove commesse o importare un file Excel.")
+# --- TAB 3: REPORTISTICA & ANALYTICS ---
+with tab_reports:
+    st.subheader("📈 Analisi e Distribuzione Carico Lavoro")
+    
+    if df.empty:
+        st.info("Nessun dato disponibile per generare i report.")
+    else:
+        df_rep = df.copy()
+        df_rep["Ore Valutate"] = pd.to_numeric(df_rep["Ore Valutate"], errors="coerce").fillna(0.0)
+        
+        # KPI riassuntivi della reportistica
+        tot_ore = df_rep["Ore Valutate"].sum()
+        ore_attivi = df_rep[df_rep["Stato"] != "Completato"]["Ore Valutate"].sum()
+        commesse_attive = len(df_rep[df_rep["Stato"] != "Completato"])
+        commesse_chiuse = len(df_rep[df_rep["Stato"] == "Completato"])
+        
+        r_k1, r_k2, r_k3, r_k4 = st.columns(4)
+        r_k1.metric("Ore Totali Valutate", f"{tot_ore:.1f} h")
+        r_k2.metric("Ore Residue (In Corso)", f"{ore_attivi:.1f} h")
+        r_k3.metric("Commesse Attive", commesse_attive)
+        r_k4.metric("Commesse Completate", commesse_chiuse)
+        
+        st.divider()
+        
+        rep_col1, rep_col2 = st.columns(2)
+        
+        with rep_col1:
+            st.write("### 👥 Attività per Tecnico Responsabile")
+            # Conteggio attività per responsabile
+            tec_counts = df_rep[df_rep["Stato"] != "Completato"]["Responsabile"].value_counts().reset_index()
+            tec_counts.columns = ["Tecnico", "Numero Attività"]
+            st.bar_chart(data=tec_counts, x="Tecnico", y="Numero Attività")
+            
+        with rep_col2:
+            st.write("### ⏱️ Carico Ore per Tecnico (Attività In Corso)")
+            ore_tec = df_rep[df_rep["Stato"] != "Completato"].groupby("Responsabile")["Ore Valutate"].sum().reset_index()
+            ore_tec.columns = ["Tecnico", "Ore Totali"]
+            st.bar_chart(data=ore_tec, x="Tecnico", y="Ore Totali")
+
+        st.divider()
+
+        rep_col3, rep_col4 = st.columns(2)
+        
+        with rep_col3:
+            st.write("### 🔥 Ripartizione per Priorità (Attività In Corso)")
+            prio_counts = df_rep[df_rep["Stato"] != "Completato"]["Priorità"].value_counts().reset_index()
+            prio_counts.columns = ["Priorità", "Numero"]
+            st.dataframe(prio_counts, use_container_width=True, hide_index=True)
+
+        with rep_col4:
+            st.write("### 🔄 Stato di Avanzamento Generale")
+            stato_counts = df_rep["Stato"].value_counts().reset_index()
+            stato_counts.columns = ["Stato", "Conteggio"]
+            st.dataframe(stato_counts, use_container_width=True, hide_index=True)
