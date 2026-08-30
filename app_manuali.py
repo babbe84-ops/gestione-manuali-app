@@ -236,6 +236,34 @@ def process_and_save_editor(key_editor, current_view_df):
     st.session_state.main_df = main_df
     save_data_to_file(main_df)
 
+@st.dialog("📊 Dettaglio Attività", width="large")
+def show_kpi_details(title, sub_df):
+    st.subheader(f"{title} ({len(sub_df)})")
+    if sub_df.empty:
+        st.info("Nessuna attività presente in questa categoria.")
+    else:
+        display_cols = [
+            "Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", 
+            "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", 
+            "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur", "Note"
+        ]
+        cols_to_show = [c for c in display_cols if c in sub_df.columns]
+        
+        dialog_col_config = {
+            "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
+            "Modelli 3D dal": st.column_config.DateColumn("Modelli 3D dal", format="DD/MM/YYYY"),
+            "Scadenza Prevista": st.column_config.DateColumn("Scadenza Prevista", format="DD/MM/YYYY"),
+            "Spedizione Wittur": st.column_config.DateColumn("Spedizione Wittur", format="DD/MM/YYYY"),
+            "Data Chiusura": st.column_config.DateColumn("Data Chiusura", format="DD/MM/YYYY"),
+        }
+        
+        st.dataframe(
+            sub_df[cols_to_show], 
+            use_container_width=True, 
+            hide_index=True,
+            column_config=dialog_col_config
+        )
+
 def generate_printable_html(df_to_print, title):
     cols = ["Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur"]
     df_clean = df_to_print[[c for c in cols if c in df_to_print.columns]].copy()
@@ -379,12 +407,33 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
             for idx, row in progetti_urgenti.iterrows():
                 st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} ({row['Responsabile']})")
 
-# --- KPI METRICS ---
+# --- KPI METRICS CON PULSANTI DI APERTURA DETTAGLIO ---
 k1, k2, k3, k4 = st.columns(4)
-with k1: st.metric(label="Totale Attività", value=len(df))
-with k2: st.metric(label="Preventivi 📋", value=len(df[df["Tipo Ordine"] == "Preventivo"]))
-with k3: st.metric(label="Confermati ✅", value=len(df[df["Tipo Ordine"] == "Confermato"]))
-with k4: st.metric(label="Urgenti 🔥", value=len(df[(df["Priorità"].str.contains("Urgente", case=False, na=False)) & (df["Stato"] != "Completato")]))
+
+df_totale = df.copy() if not df.empty else pd.DataFrame()
+df_prev = df[df["Tipo Ordine"] == "Preventivo"].copy() if not df.empty else pd.DataFrame()
+df_conf = df[df["Tipo Ordine"] == "Confermato"].copy() if not df.empty else pd.DataFrame()
+df_urg = df[(df["Priorità"].str.contains("Urgente", case=False, na=False)) & (df["Stato"] != "Completato")].copy() if not df.empty else pd.DataFrame()
+
+with k1:
+    st.metric(label="Totale Attività", value=len(df_totale))
+    if st.button("🔍 Apri Totali", key="btn_kpi_tot", use_container_width=True):
+        show_kpi_details("Tutte le Attività", df_totale)
+
+with k2:
+    st.metric(label="Preventivi 📋", value=len(df_prev))
+    if st.button("📋 Apri Preventivi", key="btn_kpi_prev", use_container_width=True):
+        show_kpi_details("Elenco Preventivi", df_prev)
+
+with k3:
+    st.metric(label="Confermati ✅", value=len(df_conf))
+    if st.button("✅ Apri Confermati", key="btn_kpi_conf", use_container_width=True):
+        show_kpi_details("Elenco Ordini Confermati", df_conf)
+
+with k4:
+    st.metric(label="Urgenti 🔥", value=len(df_urg))
+    if st.button("🔥 Apri Urgenti", key="btn_kpi_urg", use_container_width=True):
+        show_kpi_details("Elenco Attività Urgenti", df_urg)
 
 st.divider()
 
