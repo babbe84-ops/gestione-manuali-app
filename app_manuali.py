@@ -120,7 +120,7 @@ PRIORITA_OPTIONS = [
     "Bassa",
     "Normale",
     "Alta",
-    "Urgente"
+    "🚨 Urgente"
 ]
 
 ALL_COLUMNS = [
@@ -197,7 +197,10 @@ def auto_update_urgency(dataframe):
             if d_consegna:
                 giorni_rimasti = (d_consegna - today).days
                 if giorni_rimasti <= 14:
-                    dataframe.at[idx, "Priorità"] = "Urgente"
+                    dataframe.at[idx, "Priorità"] = "🚨 Urgente"
+        # Pulisce vecchi valori di formato
+        if str(row.get("Priorità")).strip() == "Urgente":
+            dataframe.at[idx, "Priorità"] = "🚨 Urgente"
     return dataframe
 
 def generate_printable_html(df_to_print, title):
@@ -321,21 +324,6 @@ def export_directly_to_target(df_to_export, filename):
     except Exception as e:
         return False, str(e)
 
-def style_zebra(df_to_style):
-    def highlight_urgente(row):
-        styles = []
-        is_even = (row.name % 2 == 0)
-        default_bg = '#ffffff' if is_even else '#f1f5f9'
-        
-        for col, val in row.items():
-            if col == "Priorità" and str(val).strip() == "Urgente":
-                styles.append('background-color: #ef4444; color: #ffffff; font-weight: bold;')
-            else:
-                styles.append(f'background-color: {default_bg}; color: #0f172a;')
-        return styles
-
-    return df_to_style.reset_index(drop=True).style.apply(highlight_urgente, axis=1)
-
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
@@ -355,7 +343,7 @@ def show_kpi_details(title, sub_df):
         ]
         cols_to_show = [c for c in display_cols if c in sub_df.columns]
         st.dataframe(
-            style_zebra(sub_df[cols_to_show]), 
+            sub_df[cols_to_show], 
             use_container_width=True, 
             hide_index=True
         )
@@ -441,7 +429,7 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
         today_val = date.today() if stato == "Completato" else None
         
         if stato != "Completato" and (nuova_consegna - date.today()).days <= 14:
-            priorita = "Urgente"
+            priorita = "🚨 Urgente"
 
         new_rows = []
         for att in attivita_selezionate:
@@ -500,6 +488,10 @@ if uploaded_file is not None:
                 resp_val = str(row.get("Responsabile", "")).strip() if pd.notnull(row.get("Responsabile")) else "Non ancora assegnato"
                 stato_imp = str(row.get("Stato", "Da iniziare")).strip() if pd.notnull(row.get("Stato")) else "Da iniziare"
                 dt_chiusura = date.today() if stato_imp == "Completato" else None
+                
+                prio_imp = str(row.get("Priorità", "Normale")).strip()
+                if prio_imp == "Urgente":
+                    prio_imp = "🚨 Urgente"
 
                 row_data = {
                     "Nr. Commessa": cod if cod.lower() not in ["nan", "none"] else f"COMM-{idx+1}",
@@ -507,7 +499,7 @@ if uploaded_file is not None:
                     "Descrizione": desc_imp if desc_imp.lower() not in ["nan", "none"] else "",
                     "Tipo Ordine": str(row.get("Tipo Ordine", "Confermato")).strip(),
                     "Attività": str(row.get("Attività", "Installation")).strip(),
-                    "Priorità": str(row.get("Priorità", "Normale")).strip(),
+                    "Priorità": prio_imp,
                     "Ore Valutate": pd.to_numeric(row.get("Ore Valutate", 0), errors="coerce") or 0.0,
                     "Responsabile": resp_val if resp_val.lower() not in ["nan", "none"] else "Non ancora assegnato",
                     "Stato": stato_imp,
@@ -550,7 +542,7 @@ if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
 today_ts = date.today()
 if not df.empty:
     progetti_in_ritardo = df[(df["Stato"] != "Completato") & (df["Scadenza Prevista"].apply(lambda x: isinstance(x, date) and x < today_ts))]
-    progetti_urgenti = df[(df["Stato"] != "Completato") & (df["Priorità"] == "Urgente")]
+    progetti_urgenti = df[(df["Stato"] != "Completato") & (df["Priorità"].str.contains("Urgente", case=False, na=False))]
 else:
     progetti_in_ritardo = pd.DataFrame()
     progetti_urgenti = pd.DataFrame()
@@ -577,7 +569,7 @@ k1, k2, k3, k4 = st.columns([1, 1, 1, 1])
 df_totale = df.copy() if not df.empty else pd.DataFrame()
 df_prev = df[df["Tipo Ordine"] == "Preventivo"].copy() if not df.empty else pd.DataFrame()
 df_conf = df[df["Tipo Ordine"] == "Confermato"].copy() if not df.empty else pd.DataFrame()
-df_urg = df[(df["Priorità"] == "Urgente") & (df["Stato"] != "Completato")].copy() if not df.empty else pd.DataFrame()
+df_urg = df[(df["Priorità"].str.contains("Urgente", case=False, na=False)) & (df["Stato"] != "Completato")].copy() if not df.empty else pd.DataFrame()
 
 with k1:
     st.metric(label="Totale Attività", value=len(df_totale))
@@ -692,18 +684,16 @@ if not df.empty:
     }
 
     def process_editor_changes(view_df, editor_state):
-        """Elabora sia le modifiche che le righe CANCELLATE dal data_editor"""
         has_changes = False
         
-        # 1. Gestione Righe CANCELLATE
+        # 1. Cancellazione righe
         deleted_indices = editor_state.get("deleted_rows", [])
         if deleted_indices:
-            # Recuperiamo gli indici originali delle righe cancellate dalla vista corrente
             original_indices_to_delete = view_df.iloc[deleted_indices].index
             st.session_state.main_df = st.session_state.main_df.drop(original_indices_to_delete)
             has_changes = True
 
-        # 2. Gestione Modifiche CELLE
+        # 2. Modifica celle
         edited_rows = editor_state.get("edited_rows", {})
         if edited_rows:
             for row_pos, col_dict in edited_rows.items():
@@ -728,7 +718,7 @@ if not df.empty:
                             st.session_state.main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
                     has_changes = True
 
-        # 3. Gestione Nuove Righe
+        # 3. Nuove righe
         added_rows = editor_state.get("added_rows", [])
         if added_rows:
             new_df_rows = []
@@ -742,24 +732,20 @@ if not df.empty:
             st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
             save_data(st.session_state.main_df)
 
-    # --- TAB 1: ATTIVITÀ IN CORSO (EDITABILE) ---
+    # --- TAB 1: ATTIVITÀ IN CORSO ---
     with tab_operativa:
         if not df_attivi.empty:
             df_attivi = process_table_df(df_attivi)
 
-            styled_attivi = style_zebra(df_attivi[st.session_state.cols_order])
-
             st.data_editor(
-                styled_attivi,
+                df_attivi[st.session_state.cols_order],
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_attivi",
-                on_change=None
+                key="editor_attivi"
             )
 
-            # Sincronizza eliminazioni e modifiche salvate nello stato
             if "editor_attivi" in st.session_state:
                 process_editor_changes(df_attivi, st.session_state["editor_attivi"])
 
@@ -798,15 +784,13 @@ if not df.empty:
         else:
             st.info("Nessuna attività in corso con i filtri selezionati.")
 
-    # --- TAB 2: ARCHIVIO COMPLETATI (EDITABILE) ---
+    # --- TAB 2: ARCHIVIO COMPLETATI ---
     with tab_completati:
         if not df_completati.empty:
             df_completati = process_table_df(df_completati)
 
-            styled_comp = style_zebra(df_completati[st.session_state.cols_order])
-
             st.data_editor(
-                styled_comp,
+                df_completati[st.session_state.cols_order],
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
@@ -897,10 +881,10 @@ with tab_reports:
             st.write("### 🔥 Ripartizione per Priorità (Attività In Corso)")
             prio_counts = df_rep[df_rep["Stato"] != "Completato"]["Priorità"].value_counts().reset_index()
             prio_counts.columns = ["Priorità", "Numero"]
-            st.dataframe(style_zebra(prio_counts), use_container_width=True, hide_index=True)
+            st.dataframe(prio_counts, use_container_width=True, hide_index=True)
 
         with rep_col4:
             st.write("### 🔄 Stato di Avanzamento Generale")
             stato_counts = df_rep["Stato"].value_counts().reset_index()
             stato_counts.columns = ["Stato", "Conteggio"]
-            st.dataframe(style_zebra(stato_counts), use_container_width=True, hide_index=True)
+            st.dataframe(stato_counts, use_container_width=True, hide_index=True)
