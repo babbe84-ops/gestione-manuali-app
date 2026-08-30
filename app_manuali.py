@@ -8,7 +8,81 @@ import shutil
 import subprocess
 import platform
 
-st.set_page_config(page_title="Gestione Manuali & Commesse", layout="wide", page_icon="📚")
+st.set_page_config(
+    page_title="Gestione Manuali & Commesse", 
+    layout="wide", 
+    page_icon="📚",
+    initial_sidebar_state="collapsed"
+)
+
+# --- STILING CSS AVANZATO E RESPONSIVE MOBILE ---
+st.markdown("""
+<style>
+    /* Tipografia e sfondo generale */
+    .stApp {
+        background-color: #f8fafc;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* Header e Titoli */
+    .main-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 0.2rem;
+    }
+    .sub-title {
+        font-size: 0.95rem;
+        color: #64748b;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Card KPI / Statistiche */
+    div[data-testid="stMetric"] {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Ottimizzazione Bottoni */
+    .stButton > button {
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease-in-out;
+    }
+    
+    /* Contenitore Form ed Editor */
+    div[data-testid="stForm"] {
+        background-color: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 1rem;
+    }
+
+    /* Media query per dispositivi Mobili (< 768px) */
+    @media (max-width: 768px) {
+        .main-title {
+            font-size: 1.4rem;
+        }
+        .sub-title {
+            font-size: 0.85rem;
+        }
+        /* Garantisce lo scrolling della tabella su schermi stretti */
+        div[data-testid="stDataFrame"] {
+            width: 100% !important;
+            overflow-x: auto !important;
+        }
+        /* Riduce i margini laterali su smartphone */
+        .block-container {
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+            padding-top: 1rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
 
 DB_FILE = "manuali_progetti_db.csv"
 BACKUP_DIR = "backups"
@@ -108,7 +182,6 @@ def safe_parse_date(val):
     return None
 
 def auto_update_urgency(dataframe):
-    """Verifica la 'Nuova consegna prevista': se mancano <= 14 giorni di calendario e non è completata, imposta Priorità = Urgente."""
     today = date.today()
     if dataframe.empty:
         return dataframe
@@ -139,47 +212,14 @@ def generate_printable_html(df_to_print, title):
         <meta charset="utf-8">
         <title>{title}</title>
         <style>
-            body {{
-                font-family: Arial, sans-serif;
-                margin: 20px;
-                color: #333;
-            }}
-            h2 {{
-                text-align: center;
-                margin-bottom: 5px;
-            }}
-            p.date {{
-                text-align: center;
-                font-size: 12px;
-                color: #666;
-                margin-bottom: 20px;
-            }}
-            table.print-table {{
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 11px;
-            }}
-            table.print-table th, table.print-table td {{
-                border: 1px solid #ccc;
-                padding: 6px 8px;
-                text-align: left;
-            }}
-            table.print-table th {{
-                background-color: #f2f2f2;
-                font-weight: bold;
-            }}
-            table.print-table tr:nth-child(even) {{
-                background-color: #fafafa;
-            }}
-            @media print {{
-                @page {{
-                    size: landscape;
-                    margin: 10mm;
-                }}
-                body {{
-                    margin: 0;
-                }}
-            }}
+            body {{ font-family: Arial, sans-serif; margin: 20px; color: #333; }}
+            h2 {{ text-align: center; margin-bottom: 5px; }}
+            p.date {{ text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }}
+            table.print-table {{ width: 100%; border-collapse: collapse; font-size: 11px; }}
+            table.print-table th, table.print-table td {{ border: 1px solid #ccc; padding: 6px 8px; text-align: left; }}
+            table.print-table th {{ background-color: #f2f2f2; font-weight: bold; }}
+            table.print-table tr:nth-child(even) {{ background-color: #fafafa; }}
+            @media print {{ @page {{ size: landscape; margin: 10mm; }} body {{ margin: 0; }} }}
         </style>
     </head>
     <body onload="window.print()">
@@ -315,12 +355,12 @@ def show_kpi_details(title, sub_df):
             hide_index=True
         )
 
-@st.dialog("🔄 Ripristina un Backup precedente")
+@st.dialog("🔄 Ripristina Backup")
 def restore_backup_dialog():
     backup_files = sorted(glob.glob(os.path.join(BACKUP_DIR, "manuali_progetti_db_*.csv")), reverse=True)
     
     if not backup_files:
-        st.info("Nessun backup disponibile al momento.")
+        st.info("Nessun backup disponibile.")
         return
 
     options = {}
@@ -329,15 +369,15 @@ def restore_backup_dialog():
         try:
             raw_ts = filename.replace("manuali_progetti_db_", "").replace(".csv", "")
             dt_obj = datetime.strptime(raw_ts, "%Y%m%d_%H%M%S")
-            label = dt_obj.strftime("Backup del %d/%m/%Y alle ore %H:%M:%S")
+            label = dt_obj.strftime("Backup del %d/%m/%Y ore %H:%M:%S")
         except Exception:
             label = filename
         options[label] = f
 
-    selected_label = st.selectbox("Seleziona la versione da ripristinare:", list(options.keys()))
+    selected_label = st.selectbox("Seleziona versione:", list(options.keys()))
     selected_file = options[selected_label]
 
-    st.warning("⚠️ **ATTENZIONE:** Il ripristino sovrascriverà i dati attuali con quelli del backup selezionato!")
+    st.warning("⚠️ **ATTENZIONE:** Il ripristino sovrascriverà i dati attuali!")
     
     col_confirm, col_cancel = st.columns(2)
     with col_confirm:
@@ -345,19 +385,21 @@ def restore_backup_dialog():
             create_automatic_backup()
             shutil.copy(selected_file, DB_FILE)
             st.session_state.main_df = load_data()
-            st.toast("✅ Database ripristinato con successo!", icon="🔄")
+            st.toast("✅ Database ripristinato!", icon="🔄")
             st.rerun()
             
     with col_cancel:
         if st.button("Annulla", use_container_width=True):
             st.rerun()
 
-st.title("📚 Gestione Manuali & Commesse")
+# --- HEADER APP ---
+st.markdown("<div class='main-title'>📚 Gestione Manuali & Commesse</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title'>Piattaforma di tracciamento commesse & documentazione tecnica</div>", unsafe_allow_html=True)
 
-# --- SIDEBAR: Configurazione Ordine Colonne ---
-st.sidebar.header("⚙️ Visibilità Colonne")
+# --- SIDEBAR RESPONSIVE ---
+st.sidebar.header("⚙️ Opzioni & Colonne")
 selected_cols = st.sidebar.multiselect(
-    "Seleziona colonne da mostrare:",
+    "Colonne visibili:",
     options=DEFAULT_ORDER,
     default=st.session_state.cols_order
 )
@@ -366,27 +408,26 @@ if selected_cols:
 
 st.sidebar.divider()
 
-# --- SIDEBAR: Inserimento Manuale ---
 st.sidebar.header("➕ Nuova Commessa")
 with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
     codice = st.text_input("Nr. Commessa*")
     rdl_val = st.text_input("RDL / Titolo*")
     descrizione_val = st.text_input("Descrizione Commessa")
     tipo_ordine = st.radio("Tipo Ordine*", TIPO_ORDINE_OPTIONS, index=1, horizontal=True)
-    attivita_selezionate = st.multiselect("Attività da svolgere*", options=ATTIVITA_OPTIONS, default=["Installation"])
-    priorita = st.selectbox("Priorità / Urgenza*", PRIORITA_OPTIONS, index=1)
-    ore_valutate = st.number_input("Ore Valutate (totali o per attività)", min_value=0.0, step=0.5)
-    responsabili_sel = st.multiselect("Responsabili Tecnici", options=TECNICI, default=["Non ancora assegnato"])
+    attivita_selezionate = st.multiselect("Attività*", options=ATTIVITA_OPTIONS, default=["Installation"])
+    priorita = st.selectbox("Priorità*", PRIORITA_OPTIONS, index=1)
+    ore_valutate = st.number_input("Ore Valutate", min_value=0.0, step=0.5)
+    responsabili_sel = st.multiselect("Tecnici", options=TECNICI, default=["Non ancora assegnato"])
     stato = st.selectbox("Stato Iniziale", ["Da iniziare", "In corso", "In revisione", "Completato"])
     avanzamento = st.slider("Avanzamento (%)", 0, 100, 0, step=5)
-    modelli_3d_dal = st.date_input("Modelli 3D dal (GG/MM/AAAA)", value=date.today(), format="DD/MM/YYYY")
-    scadenza = st.date_input("Scadenza Prevista (GG/MM/AAAA)", value=date.today(), format="DD/MM/YYYY")
-    nuova_consegna = st.date_input("Nuova consegna prevista (GG/MM/AAAA)", value=date.today(), format="DD/MM/YYYY")
-    spedizione_wittur = st.date_input("Spedizione Wittur (GG/MM/AAAA)", value=date.today(), format="DD/MM/YYYY")
+    modelli_3d_dal = st.date_input("Modelli 3D dal", value=date.today(), format="DD/MM/YYYY")
+    scadenza = st.date_input("Scadenza Prevista", value=date.today(), format="DD/MM/YYYY")
+    nuova_consegna = st.date_input("Nuova consegna prevista", value=date.today(), format="DD/MM/YYYY")
+    spedizione_wittur = st.date_input("Spedizione Wittur", value=date.today(), format="DD/MM/YYYY")
     cartella = st.text_input("Percorso Cartella Locale")
     note = st.text_area("Note")
     
-    submitted = st.form_submit_button("Salva Commessa / Attività")
+    submitted = st.form_submit_button("Salva Commessa")
     
     if submitted and codice and rdl_val:
         if not attivita_selezionate:
@@ -423,16 +464,15 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
         st.session_state.main_df = pd.concat([st.session_state.main_df, pd.DataFrame(new_rows)], ignore_index=True)
         st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
         save_data(st.session_state.main_df)
-        st.sidebar.success(f"Aggiunte {len(new_rows)} attività per la commessa '{codice}'!")
+        st.sidebar.success(f"Aggiunta commessa '{codice}'!")
         st.rerun()
 
-# --- SIDEBAR: Importazione & Merge Excel ---
 st.sidebar.divider()
-st.sidebar.header("📥 Importa / Unisci Excel")
+st.sidebar.header("📥 Importa / Merge Excel")
 uploaded_file = st.sidebar.file_uploader("Carica Excel (.xlsx / .xls)", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
-    if st.sidebar.button("Procedi Importazione & Merge"):
+    if st.sidebar.button("Procedi Merge"):
         try:
             excel_df = pd.read_excel(uploaded_file, header=0, dtype=str)
             excel_df.columns = [str(c).strip() for c in excel_df.columns]
@@ -493,15 +533,13 @@ if uploaded_file is not None:
             df_current = auto_update_urgency(df_current)
             st.session_state.main_df = df_current
             save_data(df_current)
-            st.sidebar.success(f"Merge completato! Commesse aggiornate: {aggiornati_count}, Nuove commesse: {nuovi_count}")
+            st.sidebar.success(f"Merge completato! Aggiornate: {aggiornati_count}, Nuove: {nuovi_count}")
             st.rerun()
         except Exception as e:
-            st.sidebar.error(f"Errore durante l'importazione: {e}")
+            st.sidebar.error(f"Errore importazione: {e}")
 
-# --- SIDEBAR: Gestione e Ripristino Backup ---
 st.sidebar.divider()
-st.sidebar.header("🛡️ Ripristino Dati")
-if st.sidebar.button("🔄 Gestione e Ripristino Backup", use_container_width=True):
+if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
     restore_backup_dialog()
 
 # --- ANALISI CRITICITÀ ---
@@ -514,27 +552,23 @@ else:
     progetti_urgenti = pd.DataFrame()
 
 if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
-    st.subheader("⚠️ Avvisi & Criticità")
     c_warn1, c_warn2 = st.columns(2)
-    
     with c_warn1:
         if not progetti_in_ritardo.empty:
-            st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo!**")
+            st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo**")
             for idx, row in progetti_in_ritardo.iterrows():
                 scad_val = row['Scadenza Prevista']
                 scad_str = scad_val.strftime('%d/%m/%Y') if isinstance(scad_val, date) else ""
-                st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} [{row['Attività']}] (Scaduta il {scad_str})")
+                st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} (Scaduta: {scad_str})")
                 
     with c_warn2:
         if not progetti_urgenti.empty:
-            st.warning(f"🔥 **{len(progetti_urgenti)} Ordini URGENTI in Corso!**")
+            st.warning(f"🔥 **{len(progetti_urgenti)} Ordini URGENTI in Corso**")
             for idx, row in progetti_urgenti.iterrows():
-                st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} (Tecnici: {row['Responsabile']})")
+                st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} ({row['Responsabile']})")
 
-st.divider()
-
-# --- KPI GENERALI INTERATTIVI ---
-k1, k2, k3, k4 = st.columns(4)
+# --- KPI METRICS ---
+k1, k2, k3, k4 = st.columns([1, 1, 1, 1])
 
 df_totale = df.copy() if not df.empty else pd.DataFrame()
 df_prev = df[df["Tipo Ordine"] == "Preventivo"].copy() if not df.empty else pd.DataFrame()
@@ -542,99 +576,97 @@ df_conf = df[df["Tipo Ordine"] == "Confermato"].copy() if not df.empty else pd.D
 df_urg = df[(df["Priorità"] == "Urgente") & (df["Stato"] != "Completato")].copy() if not df.empty else pd.DataFrame()
 
 with k1:
-    st.caption("Totale Attività")
-    if st.button(f"🔍 **{len(df_totale)}**", key="btn_kpi_tot", use_container_width=True):
+    st.metric(label="Totale Attività", value=len(df_totale))
+    if st.button("🔍 Apri Totali", key="btn_kpi_tot", use_container_width=True):
         show_kpi_details("Tutte le Attività", df_totale)
 
 with k2:
-    st.caption("Preventivi 📋")
-    if st.button(f"📋 **{len(df_prev)}**", key="btn_kpi_prev", use_container_width=True):
+    st.metric(label="Preventivi 📋", value=len(df_prev))
+    if st.button("📋 Apri Preventivi", key="btn_kpi_prev", use_container_width=True):
         show_kpi_details("Elenco Preventivi", df_prev)
 
 with k3:
-    st.caption("Confermati ✅")
-    if st.button(f"✅ **{len(df_conf)}**", key="btn_kpi_conf", use_container_width=True):
+    st.metric(label="Confermati ✅", value=len(df_conf))
+    if st.button("✅ Apri Confermati", key="btn_kpi_conf", use_container_width=True):
         show_kpi_details("Elenco Ordini Confermati", df_conf)
 
 with k4:
-    st.caption("Urgenti 🔥")
-    if st.button(f"🔥 **{len(df_urg)}**", key="btn_kpi_urg", use_container_width=True):
-        show_kpi_details("Elenco Attività Urgenti in Corso", df_urg)
+    st.metric(label="Urgenti 🔥", value=len(df_urg))
+    if st.button("🔥 Apri Urgenti", key="btn_kpi_urg", use_container_width=True):
+        show_kpi_details("Elenco Attività Urgenti", df_urg)
 
 st.divider()
 
-# --- AGGIORNAMENTO RAPIDO ---
+# --- AGGIORNAMENTO RAPIDO RESPONSIVE ---
 if not df.empty:
-    st.subheader("⚡ Aggiornamento Rapido Attività")
-    c_sel, c_tipo, c_prio, c_resp, c_st, c_av, c_btn = st.columns([2.5, 1.2, 1.2, 2.2, 1.2, 1.2, 1])
-    
-    with c_sel:
-        options_list = [f"ID:{i} | {row['Nr. Commessa']} - {row['RDL']} ({row['Attività']})" for i, row in df.iterrows()]
-        commessa_mod = st.selectbox("Seleziona Attività:", options=options_list, key="sel_mod")
-    
-    idx_target = int(commessa_mod.split(" | ")[0].replace("ID:", ""))
-    row_attuale = df.iloc[idx_target]
-    
-    with c_tipo:
-        tipo_curr = row_attuale["Tipo Ordine"] if row_attuale["Tipo Ordine"] in TIPO_ORDINE_OPTIONS else "Confermato"
-        nuovo_tipo = st.selectbox("Tipo Ordine", TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(tipo_curr))
-
-    with c_prio:
-        prio_curr = row_attuale["Priorità"] if row_attuale["Priorità"] in PRIORITA_OPTIONS else "Normale"
-        nuova_prio = st.selectbox("Priorità", PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(prio_curr))
-
-    with c_resp:
-        current_resps = [r.strip() for r in str(row_attuale["Responsabile"]).split(",") if r.strip() in TECNICI]
-        if not current_resps:
-            current_resps = ["Non ancora assegnato"]
-        nuovi_resp = st.multiselect("Tecnici", TECNICI, default=current_resps)
-
-    with c_st:
-        stati_opt = ["Da iniziare", "In corso", "In revisione", "Completato"]
-        st_curr = row_attuale["Stato"] if row_attuale["Stato"] in stati_opt else stati_opt[0]
-        nuovo_stato = st.selectbox("Stato", stati_opt, index=stati_opt.index(st_curr))
+    with st.expander("⚡ **Aggiornamento Rapido Stato / Tecnico**", expanded=False):
+        c_sel, c_tipo, c_prio = st.columns([2, 1, 1])
+        c_resp, c_st, c_av, c_btn = st.columns([2, 1, 1, 1])
         
-    with c_av:
-        avanz_default = 100 if nuovo_stato == "Completato" else int(row_attuale["Avanzamento (%)"])
-        nuovo_avanzamento = st.slider("Avanzamento %", 0, 100, avanz_default, step=5)
+        with c_sel:
+            options_list = [f"ID:{i} | {row['Nr. Commessa']} - {row['RDL']} ({row['Attività']})" for i, row in df.iterrows()]
+            commessa_mod = st.selectbox("Seleziona Attività:", options=options_list, key="sel_mod")
         
-    with c_btn:
-        st.write("")
-        st.write("")
-        if st.button("✅ Applica"):
-            st.session_state.main_df.at[idx_target, "Tipo Ordine"] = nuovo_tipo
-            st.session_state.main_df.at[idx_target, "Priorità"] = nuova_prio
-            st.session_state.main_df.at[idx_target, "Responsabile"] = ", ".join(nuovi_resp) if nuovi_resp else "Non ancora assegnato"
+        idx_target = int(commessa_mod.split(" | ")[0].replace("ID:", ""))
+        row_attuale = df.iloc[idx_target]
+        
+        with c_tipo:
+            tipo_curr = row_attuale["Tipo Ordine"] if row_attuale["Tipo Ordine"] in TIPO_ORDINE_OPTIONS else "Confermato"
+            nuovo_tipo = st.selectbox("Tipo Ordine", TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(tipo_curr))
+
+        with c_prio:
+            prio_curr = row_attuale["Priorità"] if row_attuale["Priorità"] in PRIORITA_OPTIONS else "Normale"
+            nuova_prio = st.selectbox("Priorità", PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(prio_curr))
+
+        with c_resp:
+            current_resps = [r.strip() for r in str(row_attuale["Responsabile"]).split(",") if r.strip() in TECNICI]
+            if not current_resps:
+                current_resps = ["Non ancora assegnato"]
+            nuovi_resp = st.multiselect("Tecnici", TECNICI, default=current_resps)
+
+        with c_st:
+            stati_opt = ["Da iniziare", "In corso", "In revisione", "Completato"]
+            st_curr = row_attuale["Stato"] if row_attuale["Stato"] in stati_opt else stati_opt[0]
+            nuovo_stato = st.selectbox("Stato", stati_opt, index=stati_opt.index(st_curr))
             
-            if nuovo_stato == "Completato" and row_attuale["Stato"] != "Completato":
-                st.session_state.main_df.at[idx_target, "Data Chiusura"] = date.today()
-            elif nuovo_stato != "Completato":
-                st.session_state.main_df.at[idx_target, "Data Chiusura"] = None
+        with c_av:
+            avanz_default = 100 if nuovo_stato == "Completato" else int(row_attuale["Avanzamento (%)"])
+            nuovo_avanzamento = st.slider("Avanzamento %", 0, 100, avanz_default, step=5)
+            
+        with c_btn:
+            st.write("")
+            st.write("")
+            if st.button("✅ Applica", use_container_width=True):
+                st.session_state.main_df.at[idx_target, "Tipo Ordine"] = nuovo_tipo
+                st.session_state.main_df.at[idx_target, "Priorità"] = nuova_prio
+                st.session_state.main_df.at[idx_target, "Responsabile"] = ", ".join(nuovi_resp) if nuovi_resp else "Non ancora assegnato"
                 
-            st.session_state.main_df.at[idx_target, "Stato"] = nuovo_stato
-            st.session_state.main_df.at[idx_target, "Avanzamento (%)"] = 100 if nuovo_stato == "Completato" else nuovo_avanzamento
-            
-            st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
-            save_data(st.session_state.main_df)
-            st.success("Attività aggiornata!")
-            st.rerun()
-
-st.divider()
+                if nuovo_stato == "Completato" and row_attuale["Stato"] != "Completato":
+                    st.session_state.main_df.at[idx_target, "Data Chiusura"] = date.today()
+                elif nuovo_stato != "Completato":
+                    st.session_state.main_df.at[idx_target, "Data Chiusura"] = None
+                    
+                st.session_state.main_df.at[idx_target, "Stato"] = nuovo_stato
+                st.session_state.main_df.at[idx_target, "Avanzamento (%)"] = 100 if nuovo_stato == "Completato" else nuovo_avanzamento
+                
+                st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
+                save_data(st.session_state.main_df)
+                st.success("Attività aggiornata!")
+                st.rerun()
 
 # --- TABELLE OPERATIVE ---
-
 if not df.empty:
-    st.subheader("🔍 Filtri & Ordinamento Tabelle")
+    st.subheader("🔍 Filtri & Ricerca")
     
-    f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+    f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1, 1, 1])
     with f_col1:
-        search_query = st.text_input("Cerca testo (Commessa, RDL, Descrizione, Note):", "")
+        search_query = st.text_input("🔍 Cerca testo...", "")
     with f_col2:
-        filtro_tecnico = st.multiselect("Filtra per Tecnico:", options=TECNICI)
+        filtro_tecnico = st.multiselect("Tecnico:", options=TECNICI)
     with f_col3:
-        filtro_attivita = st.multiselect("Filtra per Attività:", options=ATTIVITA_OPTIONS)
+        filtro_attivita = st.multiselect("Attività:", options=ATTIVITA_OPTIONS)
     with f_col4:
-        filtro_prio = st.multiselect("Filtra per Priorità:", options=PRIORITA_OPTIONS)
+        filtro_prio = st.multiselect("Priorità:", options=PRIORITA_OPTIONS)
 
     available_sort_cols = [c for c in DEFAULT_ORDER if c in st.session_state.cols_order and c != "Apri Cartella"]
     if "Nuova consegna prevista" in available_sort_cols:
@@ -644,13 +676,13 @@ if not df.empty:
     s_col1, s_col2 = st.columns([3, 1])
     with s_col1:
         sort_col_selected = st.selectbox(
-            "Sort/Ordina tabella in base alla colonna:",
+            "Ordina per:",
             options=available_sort_cols,
             index=available_sort_cols.index(st.session_state.sort_column) if st.session_state.sort_column in available_sort_cols else 0
         )
         st.session_state.sort_column = sort_col_selected
     with s_col2:
-        sort_order = st.radio("Ordine:", options=["Crescente ⬆️", "Decrescente ⬇️"], horizontal=True)
+        sort_order = st.radio("Verso:", options=["Crescente ⬆️", "Decrescente ⬇️"], horizontal=True)
         st.session_state.sort_ascending = (sort_order == "Crescente ⬆️")
     
     df_base = df.copy()
@@ -691,24 +723,25 @@ if not df.empty:
 
         return target_df
 
+    # Configurazione grafica avanzata colonne
     col_config = {
         "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
         "RDL": st.column_config.TextColumn("RDL", pinned=True),
-        "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna prevista", format="DD/MM/YYYY"),
+        "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
         "Descrizione": st.column_config.TextColumn("Descrizione"),
         "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS, required=True),
         "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS, required=True),
         "Tipo Ordine": st.column_config.SelectboxColumn("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, required=True),
         "Responsabile": st.column_config.TextColumn("Responsabile Tecnico"),
         "Stato": st.column_config.SelectboxColumn("Stato", options=["Da iniziare", "In corso", "In revisione", "Completato"], required=True),
-        "Avanzamento (%)": st.column_config.NumberColumn("Avanzamento (%)", min_value=0, max_value=100, step=5),
+        "Avanzamento (%)": st.column_config.ProgressColumn("Avanzamento", min_value=0, max_value=100, format="%d%%"),
         "Modelli 3D dal": st.column_config.DateColumn("Modelli 3D dal", format="DD/MM/YYYY"),
         "Scadenza Prevista": st.column_config.DateColumn("Scadenza Prevista", format="DD/MM/YYYY"),
         "Spedizione Wittur": st.column_config.DateColumn("Spedizione Wittur", format="DD/MM/YYYY"),
         "Data Chiusura": st.column_config.DateColumn("Data Chiusura", format="DD/MM/YYYY"),
-        "Percorso Cartella": st.column_config.TextColumn("Percorso Cartella Locale"),
-        "Apri Cartella": st.column_config.CheckboxColumn("📂 Apri", help="Spunta per aprire la cartella nel sistema"),
-        "Ore Valutate": st.column_config.NumberColumn("Ore Valutate", format="%.1f")
+        "Percorso Cartella": st.column_config.TextColumn("Cartella Locale"),
+        "Apri Cartella": st.column_config.CheckboxColumn("📂 Apri"),
+        "Ore Valutate": st.column_config.NumberColumn("Ore Val.", format="%.1f")
     }
 
     def sync_edited_changes(edited_df):
@@ -728,128 +761,120 @@ if not df.empty:
                             
         st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
 
-    # --- TABELLA 1: ATTIVITÀ IN CORSO ---
-    st.subheader("📋 1. Attività In Corso / Da Iniziare")
-    if not df_attivi.empty:
-        df_attivi = process_table_df(df_attivi)
+    # SCHEDE PRINCIPALI TABELLE
+    tab1, tab2 = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati"])
 
-        edited_attivi = st.data_editor(
-            df_attivi[st.session_state.cols_order],
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config=col_config,
-            hide_index=True,
-            key="editor_attivi"
-        )
+    with tab1:
+        if not df_attivi.empty:
+            df_attivi = process_table_df(df_attivi)
 
-        sync_edited_changes(edited_attivi)
-
-        opened = edited_attivi[edited_attivi["Apri Cartella"] == True] if "Apri Cartella" in edited_attivi.columns else pd.DataFrame()
-        if not opened.empty:
-            for idx, r in opened.iterrows():
-                if r.get("Percorso Cartella"):
-                    open_folder(r["Percorso Cartella"])
-
-        c_btn1, c_btn2, c_btn3, c_btn4 = st.columns([1.8, 1, 1.3, 1.4])
-        with c_btn1:
-            if st.button("💾 Salva Modifiche Attività In Corso"):
-                save_data(st.session_state.main_df)
-                st.success("Modifiche e backup salvati con successo!")
-                st.rerun()
-                
-        with c_btn2:
-            excel_data_attivi = convert_df_to_excel(df_attivi)
-            st.download_button(
-                label="📥 Scarica Excel",
-                data=excel_data_attivi,
-                file_name=f"Attivita_In_Corso_{date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-            
-        with c_btn3:
-            if st.button("📁 Salva in Wittur/MANUALI", key="btn_wittur_attivi", use_container_width=True):
-                fname = f"Attivita_In_Corso_{date.today()}.xlsx"
-                ok, res = export_directly_to_target(df_attivi, fname)
-                if ok:
-                    st.success(f"Salvato in {TARGET_FOLDER}")
-                else:
-                    st.error(f"Errore durante il salvataggio: {res}")
-
-        with c_btn4:
-            html_print_attivi = generate_printable_html(df_attivi, "Tabella Attività In Corso / Da Iniziare")
-            st.download_button(
-                label="🖨️ Stampa / Esporta PDF Tabella",
-                data=html_print_attivi,
-                file_name=f"Stampa_Attivita_In_Corso_{date.today()}.html",
-                mime="text/html",
-                use_container_width=True
+            edited_attivi = st.data_editor(
+                df_attivi[st.session_state.cols_order],
+                num_rows="dynamic",
+                use_container_width=True,
+                column_config=col_config,
+                hide_index=True,
+                key="editor_attivi"
             )
 
-    else:
-        st.info("Nessuna attività in corso.")
+            sync_edited_changes(edited_attivi)
 
-    st.divider()
+            opened = edited_attivi[edited_attivi["Apri Cartella"] == True] if "Apri Cartella" in edited_attivi.columns else pd.DataFrame()
+            if not opened.empty:
+                for idx, r in opened.iterrows():
+                    if r.get("Percorso Cartella"):
+                        open_folder(r["Percorso Cartella"])
 
-    # --- TABELLA 2: ATTIVITÀ COMPLETATE ---
-    st.subheader("✅ 2. Attività Completate (Archivio)")
-    if not df_completati.empty:
-        df_completati = process_table_df(df_completati)
+            b1, b2, b3, b4 = st.columns([1.5, 1, 1.2, 1.3])
+            with b1:
+                if st.button("💾 Salva Modifiche In Corso", use_container_width=True):
+                    save_data(st.session_state.main_df)
+                    st.toast("✅ Modifiche salvate con successo!")
+                    st.rerun()
+            with b2:
+                excel_data_attivi = convert_df_to_excel(df_attivi)
+                st.download_button(
+                    label="📥 Scarica Excel",
+                    data=excel_data_attivi,
+                    file_name=f"Attivita_In_Corso_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            with b3:
+                if st.button("📁 Salva in Wittur", key="btn_wittur_attivi", use_container_width=True):
+                    fname = f"Attivita_In_Corso_{date.today()}.xlsx"
+                    ok, res = export_directly_to_target(df_attivi, fname)
+                    if ok:
+                        st.success(f"Salvato in {TARGET_FOLDER}")
+                    else:
+                        st.error(f"Errore: {res}")
+            with b4:
+                html_print_attivi = generate_printable_html(df_attivi, "Tabella Attività In Corso")
+                st.download_button(
+                    label="🖨️ Stampa / PDF",
+                    data=html_print_attivi,
+                    file_name=f"Stampa_Attivita_In_Corso_{date.today()}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+        else:
+            st.info("Nessuna attività in corso.")
 
-        edited_comp = st.data_editor(
-            df_completati[st.session_state.cols_order],
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config=col_config,
-            hide_index=True,
-            key="editor_completati"
-        )
+    with tab2:
+        if not df_completati.empty:
+            df_completati = process_table_df(df_completati)
 
-        sync_edited_changes(edited_comp)
-
-        opened_comp = edited_comp[edited_comp["Apri Cartella"] == True] if "Apri Cartella" in edited_comp.columns else pd.DataFrame()
-        if not opened_comp.empty:
-            for idx, r in opened_comp.iterrows():
-                if r.get("Percorso Cartella"):
-                    open_folder(r["Percorso Cartella"])
-
-        c_comp1, c_comp2, c_comp3, c_comp4 = st.columns([1.8, 1, 1.3, 1.4])
-        with c_comp1:
-            if st.button("💾 Salva Modifiche Archivio Completati"):
-                save_data(st.session_state.main_df)
-                st.success("Archivio e backup salvati con successo!")
-                st.rerun()
-                
-        with c_comp2:
-            excel_data_comp = convert_df_to_excel(df_completati)
-            st.download_button(
-                label="📥 Scarica Excel",
-                data=excel_data_comp,
-                file_name=f"Archivio_Completati_{date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+            edited_comp = st.data_editor(
+                df_completati[st.session_state.cols_order],
+                num_rows="dynamic",
+                use_container_width=True,
+                column_config=col_config,
+                hide_index=True,
+                key="editor_completati"
             )
-            
-        with c_comp3:
-            if st.button("📁 Salva in Wittur/MANUALI", key="btn_wittur_comp", use_container_width=True):
-                fname = f"Archivio_Completati_{date.today()}.xlsx"
-                ok, res = export_directly_to_target(df_completati, fname)
-                if ok:
-                    st.success(f"Salvato in {TARGET_FOLDER}")
-                else:
-                    st.error(f"Errore durante il salvataggio: {res}")
 
-        with c_comp4:
-            html_print_comp = generate_printable_html(df_completati, "Tabella Attività Completate (Archivio)")
-            st.download_button(
-                label="🖨️ Stampa / Esporta PDF Tabella",
-                data=html_print_comp,
-                file_name=f"Stampa_Archivio_Completati_{date.today()}.html",
-                mime="text/html",
-                use_container_width=True
-            )
-    else:
-        st.info("Nessuna attività completata.")
+            sync_edited_changes(edited_comp)
+
+            opened_comp = edited_comp[edited_comp["Apri Cartella"] == True] if "Apri Cartella" in edited_comp.columns else pd.DataFrame()
+            if not opened_comp.empty:
+                for idx, r in opened_comp.iterrows():
+                    if r.get("Percorso Cartella"):
+                        open_folder(r["Percorso Cartella"])
+
+            c1, c2, c3, c4 = st.columns([1.5, 1, 1.2, 1.3])
+            with c1:
+                if st.button("💾 Salva Modifiche Archivio", use_container_width=True):
+                    save_data(st.session_state.main_df)
+                    st.toast("✅ Archivio salvato!")
+                    st.rerun()
+            with c2:
+                excel_data_comp = convert_df_to_excel(df_completati)
+                st.download_button(
+                    label="📥 Scarica Excel",
+                    data=excel_data_comp,
+                    file_name=f"Archivio_Completati_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            with c3:
+                if st.button("📁 Salva in Wittur", key="btn_wittur_comp", use_container_width=True):
+                    fname = f"Archivio_Completati_{date.today()}.xlsx"
+                    ok, res = export_directly_to_target(df_completati, fname)
+                    if ok:
+                        st.success(f"Salvato in {TARGET_FOLDER}")
+                    else:
+                        st.error(f"Errore: {res}")
+            with c4:
+                html_print_comp = generate_printable_html(df_completati, "Tabella Attività Completate")
+                st.download_button(
+                    label="🖨️ Stampa / PDF",
+                    data=html_print_comp,
+                    file_name=f"Stampa_Archivio_Completati_{date.today()}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+        else:
+            st.info("Nessuna attività completata.")
 
 else:
-    st.info("Nessuna commessa presente. Carica il file Excel a sinistra per iniziare.")
+    st.info("Nessuna commessa presente. Utilizza il menu a sinistra per aggiungere nuove commesse o importare un file Excel.")
