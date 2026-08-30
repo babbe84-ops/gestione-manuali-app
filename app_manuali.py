@@ -37,7 +37,7 @@ st.markdown("""
         margin-bottom: 1.2rem;
     }
 
-    /* Pulsanti ad alta visibilità e ben cliccabili */
+    /* Pulsanti ad alta visibilità */
     .stButton > button {
         background-color: #2563eb !important;
         color: #ffffff !important;
@@ -58,7 +58,7 @@ st.markdown("""
         transform: translateY(0px);
     }
 
-    /* Bottoni secondari / Download */
+    /* Bottoni Download */
     .stDownloadButton > button {
         background-color: #0f766e !important;
         color: #ffffff !important;
@@ -70,7 +70,7 @@ st.markdown("""
         background-color: #115e59 !important;
     }
 
-    /* Card KPI riassuntive */
+    /* Card KPI */
     div[data-testid="stMetric"] {
         background: #ffffff;
         border: 1px solid #cbd5e1;
@@ -79,7 +79,6 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
 
-    /* Ottimizzazione mobile per dataframe */
     @media (max-width: 768px) {
         .main-title { font-size: 1.4rem; }
         .block-container {
@@ -323,7 +322,6 @@ def export_directly_to_target(df_to_export, filename):
         return False, str(e)
 
 def style_zebra(df_to_style):
-    """Applica il colore alternato alle righe e evidenzia in rosso le celle 'Urgente'"""
     def highlight_urgente(row):
         styles = []
         is_even = (row.name % 2 == 0)
@@ -693,30 +691,56 @@ if not df.empty:
         "Ore Valutate": st.column_config.NumberColumn("Ore Val.", format="%.1f")
     }
 
-    def sync_edited_changes(edited_df):
-        for idx, row in edited_df.iterrows():
-            if idx in st.session_state.main_df.index:
-                for c in ALL_COLUMNS:
-                    if c in edited_df.columns:
-                        val = row[c]
-                        if c in DATE_COLUMNS:
-                            st.session_state.main_df.at[idx, c] = safe_parse_date(val)
-                        elif c == "Ore Valutate":
-                            st.session_state.main_df.at[idx, c] = float(pd.to_numeric(val, errors="coerce") or 0.0)
-                        elif c == "Avanzamento (%)":
-                            st.session_state.main_df.at[idx, c] = int(pd.to_numeric(val, errors="coerce") or 0)
-                        elif c == "Stato":
-                            old_st = st.session_state.main_df.at[idx, "Stato"]
-                            st.session_state.main_df.at[idx, c] = str(val)
-                            if val == "Completato" and old_st != "Completato":
-                                st.session_state.main_df.at[idx, "Avanzamento (%)"] = 100
-                                st.session_state.main_df.at[idx, "Data Chiusura"] = date.today()
-                            elif val != "Completato":
-                                st.session_state.main_df.at[idx, "Data Chiusura"] = None
+    def process_editor_changes(view_df, editor_state):
+        """Elabora sia le modifiche che le righe CANCELLATE dal data_editor"""
+        has_changes = False
+        
+        # 1. Gestione Righe CANCELLATE
+        deleted_indices = editor_state.get("deleted_rows", [])
+        if deleted_indices:
+            # Recuperiamo gli indici originali delle righe cancellate dalla vista corrente
+            original_indices_to_delete = view_df.iloc[deleted_indices].index
+            st.session_state.main_df = st.session_state.main_df.drop(original_indices_to_delete)
+            has_changes = True
+
+        # 2. Gestione Modifiche CELLE
+        edited_rows = editor_state.get("edited_rows", {})
+        if edited_rows:
+            for row_pos, col_dict in edited_rows.items():
+                orig_idx = view_df.index[row_pos]
+                if orig_idx in st.session_state.main_df.index:
+                    for col_name, new_val in col_dict.items():
+                        if col_name in DATE_COLUMNS:
+                            st.session_state.main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
+                        elif col_name == "Ore Valutate":
+                            st.session_state.main_df.at[orig_idx, col_name] = float(pd.to_numeric(new_val, errors="coerce") or 0.0)
+                        elif col_name == "Avanzamento (%)":
+                            st.session_state.main_df.at[orig_idx, col_name] = int(pd.to_numeric(new_val, errors="coerce") or 0)
+                        elif col_name == "Stato":
+                            old_st = st.session_state.main_df.at[orig_idx, "Stato"]
+                            st.session_state.main_df.at[orig_idx, col_name] = str(new_val)
+                            if new_val == "Completato" and old_st != "Completato":
+                                st.session_state.main_df.at[orig_idx, "Avanzamento (%)"] = 100
+                                st.session_state.main_df.at[orig_idx, "Data Chiusura"] = date.today()
+                            elif new_val != "Completato":
+                                st.session_state.main_df.at[orig_idx, "Data Chiusura"] = None
                         else:
-                            st.session_state.main_df.at[idx, c] = str(val) if pd.notnull(val) else ""
-                            
-        st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
+                            st.session_state.main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
+                    has_changes = True
+
+        # 3. Gestione Nuove Righe
+        added_rows = editor_state.get("added_rows", [])
+        if added_rows:
+            new_df_rows = []
+            for a_row in added_rows:
+                row_dict = {col: a_row.get(col, "") for col in ALL_COLUMNS}
+                new_df_rows.append(row_dict)
+            st.session_state.main_df = pd.concat([st.session_state.main_df, pd.DataFrame(new_df_rows)], ignore_index=True)
+            has_changes = True
+
+        if has_changes:
+            st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
+            save_data(st.session_state.main_df)
 
     # --- TAB 1: ATTIVITÀ IN CORSO (EDITABILE) ---
     with tab_operativa:
@@ -725,16 +749,19 @@ if not df.empty:
 
             styled_attivi = style_zebra(df_attivi[st.session_state.cols_order])
 
-            edited_attivi = st.data_editor(
+            st.data_editor(
                 styled_attivi,
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_attivi"
+                key="editor_attivi",
+                on_change=None
             )
 
-            sync_edited_changes(edited_attivi)
+            # Sincronizza eliminazioni e modifiche salvate nello stato
+            if "editor_attivi" in st.session_state:
+                process_editor_changes(df_attivi, st.session_state["editor_attivi"])
 
             b1, b2, b3, b4 = st.columns([1.5, 1, 1.2, 1.3])
             with b1:
@@ -778,7 +805,7 @@ if not df.empty:
 
             styled_comp = style_zebra(df_completati[st.session_state.cols_order])
 
-            edited_comp = st.data_editor(
+            st.data_editor(
                 styled_comp,
                 num_rows="dynamic",
                 use_container_width=True,
@@ -787,7 +814,8 @@ if not df.empty:
                 key="editor_completati"
             )
 
-            sync_edited_changes(edited_comp)
+            if "editor_completati" in st.session_state:
+                process_editor_changes(df_completati, st.session_state["editor_completati"])
 
             c1, c2, c3, c4 = st.columns([1.5, 1, 1.2, 1.3])
             with c1:
