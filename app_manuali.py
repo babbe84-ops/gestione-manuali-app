@@ -143,12 +143,17 @@ def auto_update_urgency(dataframe):
     if dataframe.empty:
         return dataframe
     for idx, row in dataframe.iterrows():
+        prio_curr = str(row.get("Priorità", "")).strip()
+        # Normalizzazione del testo della priorità per evitare incompatibilità
+        if prio_curr in ["Urgente", "🚨 Urgente"]:
+            dataframe.at[idx, "Priorità"] = "🚨 Urgente"
+        elif prio_curr not in PRIORITA_OPTIONS:
+            dataframe.at[idx, "Priorità"] = "Normale"
+
         if row.get("Stato") != "Completato":
             d_consegna = safe_parse_date(row.get("Nuova consegna prevista"))
             if d_consegna and (d_consegna - today).days <= 14:
                 dataframe.at[idx, "Priorità"] = "🚨 Urgente"
-        if str(row.get("Priorità")).strip() in ["Urgente", "🚨 Urgente"]:
-            dataframe.at[idx, "Priorità"] = "🚨 Urgente"
     return dataframe
 
 def load_data():
@@ -189,12 +194,10 @@ if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
 def process_and_save_editor(key_editor, current_view_df):
-    """Salvataggio robusto basato su ricerca univoca di Commessa e RDL (senza errori di indice)"""
     editor_state = st.session_state.get(key_editor, {})
     main_df = st.session_state.main_df.copy()
     has_changes = False
 
-    # 1. Cancellazione righe
     deleted_positions = editor_state.get("deleted_rows", [])
     if deleted_positions:
         for pos in deleted_positions:
@@ -209,7 +212,6 @@ def process_and_save_editor(key_editor, current_view_df):
             main_df = main_df[~mask]
             has_changes = True
 
-    # 2. Modifica celle
     edited_rows = editor_state.get("edited_rows", {})
     if edited_rows:
         for pos_str, changes in edited_rows.items():
@@ -219,7 +221,6 @@ def process_and_save_editor(key_editor, current_view_df):
             c_rdl = target_row["RDL"]
             c_att = target_row.get("Attività", "")
 
-            # Troviamo l'indice reale nel dataframe principale
             matches = main_df[(main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
                               (main_df["RDL"].astype(str) == str(c_rdl)) & 
                               (main_df["Attività"].astype(str) == str(c_att))]
@@ -245,7 +246,6 @@ def process_and_save_editor(key_editor, current_view_df):
                         main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
                 has_changes = True
 
-    # 3. Nuove righe
     added_rows = editor_state.get("added_rows", [])
     if added_rows:
         new_records = []
