@@ -780,8 +780,9 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
-# Configurazione Colonne: Responsabile convertito in SelectboxColumn
+# Configurazione Colonne con Checkbox di selezione integrata + SelectboxColumn per Responsabile
 col_config = {
+    "Seleziona": st.column_config.CheckboxColumn("📌", default=False),
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
     "RDL": st.column_config.TextColumn("RDL", pinned=True),
     "Nuova consegna prevista": st.column_config.DateColumn("Nuova Consegna", format="DD/MM/YYYY"),
@@ -821,6 +822,7 @@ if not df.empty:
                 ascending=st.session_state.sort_ascending, 
                 na_position='last'
             )
+        target_df.insert(0, "Seleziona", False)
         return target_df
 
     df_attivi = prepare_view(df_base[df_base["Stato"] != "Completato"])
@@ -829,26 +831,21 @@ if not df.empty:
     # --- TAB 1: ATTIVITÀ IN CORSO ---
     with tab_operativa:
         if not df_attivi.empty:
-            view_attivi = df_attivi[st.session_state.cols_order].copy()
+            view_attivi = df_attivi[["Seleziona"] + st.session_state.cols_order].copy()
             
-            # DataEditor con selezione nativa integrata
-            editor_attivi_state = st.data_editor(
+            edited_attivi = st.data_editor(
                 view_attivi,
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
                 key="editor_attivi"
             )
 
-            # Controllo se l'utente ha spuntato una riga nella tabella
-            selected_rows = editor_attivi_state.get("selection", {}).get("rows", [])
-            if selected_rows:
-                sel_idx = selected_rows[0]
-                row_selected = view_attivi.iloc[sel_idx]
-                
+            # Rilevamento della spunta sulla casella "Seleziona"
+            selected_rows = edited_attivi[edited_attivi["Seleziona"] == True]
+            if not selected_rows.empty:
+                row_selected = selected_rows.iloc[0]
                 c_num = row_selected["Nr. Commessa"]
                 c_rdl = row_selected["RDL"]
                 c_att = row_selected.get("Attività", "")
@@ -859,8 +856,7 @@ if not df.empty:
                 ]
                 if not orig_matches.empty:
                     orig_index = orig_matches.index[0]
-                    
-                    st.write(f"📍 **Riga Selezionata:** Commessa **{c_num}** - *{c_rdl}*")
+                    st.info(f"📍 Commessa selezionata: **{c_num}** - *{c_rdl}*")
                     col_action1, col_action2, col_action3 = st.columns(3)
                     with col_action1:
                         if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_attivi", use_container_width=True):
@@ -894,24 +890,20 @@ if not df.empty:
     # --- TAB 2: ARCHIVIO COMPLETATI ---
     with tab_completati:
         if not df_completati.empty:
-            view_comp = df_completati[st.session_state.cols_order].copy()
+            view_comp = df_completati[["Seleziona"] + st.session_state.cols_order].copy()
             
-            editor_comp_state = st.data_editor(
+            edited_comp = st.data_editor(
                 view_comp,
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
                 key="editor_completati"
             )
 
-            selected_rows_comp = editor_comp_state.get("selection", {}).get("rows", [])
-            if selected_rows_comp:
-                sel_idx_comp = selected_rows_comp[0]
-                row_selected_comp = view_comp.iloc[sel_idx_comp]
-                
+            selected_rows_comp = edited_comp[edited_comp["Seleziona"] == True]
+            if not selected_rows_comp.empty:
+                row_selected_comp = selected_rows_comp.iloc[0]
                 c_num = row_selected_comp["Nr. Commessa"]
                 c_rdl = row_selected_comp["RDL"]
                 c_att = row_selected_comp.get("Attività", "")
@@ -922,8 +914,7 @@ if not df.empty:
                 ]
                 if not orig_matches_comp.empty:
                     orig_index_comp = orig_matches_comp.index[0]
-                    
-                    st.write(f"📍 **Riga Selezionata:** Commessa **{c_num}** - *{c_rdl}*")
+                    st.info(f"📍 Commessa selezionata: **{c_num}** - *{c_rdl}*")
                     col_action_comp1, col_action_comp2, col_action_comp3 = st.columns(3)
                     with col_action_comp1:
                         if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_comp", use_container_width=True):
