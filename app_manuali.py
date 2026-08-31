@@ -850,7 +850,12 @@ if not df.empty:
                             delete_single_row_dialog(row_selected.to_dict(), orig_index)
 
             st.divider()
-            b1, b2 = st.columns([1, 1.3])
+            b0, b1, b2 = st.columns([1.5, 1, 1.3])
+            with b0:
+                if st.button("💾 Salva Modifiche Rapide Celle", key="btn_save_attivi", use_container_width=True):
+                    save_data_to_file(st.session_state.main_df)
+                    st.toast("✅ Database e modifiche salvate correttamente!", icon="💾")
+                    st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button("📥 Scarica Excel", data=excel_data_attivi, file_name=f"Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
@@ -902,7 +907,12 @@ if not df.empty:
                             delete_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
 
             st.divider()
-            c1, c2 = st.columns([1, 1.3])
+            c0, c1, c2 = st.columns([1.5, 1, 1.3])
+            with c0:
+                if st.button("💾 Salva Modifiche Rapide Celle Archivio", key="btn_save_comp", use_container_width=True):
+                    save_data_to_file(st.session_state.main_df)
+                    st.toast("✅ Database e modifiche salvate correttamente!", icon="💾")
+                    st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button("📥 Scarica Excel", data=excel_data_comp, file_name=f"Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
