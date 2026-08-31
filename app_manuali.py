@@ -296,50 +296,57 @@ def save_data_to_file(df_to_save):
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
-# --- SALVATAGGIO DIRETTO DA EDITED DATAFRAME ---
-def save_direct_cell_edits(edited_df, original_view_df):
+# --- CALLBACK PER SALVATAGGIO AUTOMATICO CELLE ---
+def handle_editor_change(key_editor, current_view_df):
+    changes = st.session_state.get(key_editor, {})
+    edited_rows = changes.get("edited_rows", {})
+    if not edited_rows:
+        return
+        
     main_df = st.session_state.main_df.copy()
+    has_updated = False
     
-    # Rimuoviamo la colonna "Seleziona" se presente
-    clean_edited = edited_df.drop(columns=["Seleziona"], errors="ignore")
-    
-    for row_idx, edited_row in clean_edited.iterrows():
-        c_num = edited_row["Nr. Commessa"]
-        c_rdl = edited_row["RDL"]
-        c_att = edited_row.get("Attività", "")
-        
-        # Troviamo la riga corrispondente nel database principale
-        matches = main_df[
-            (main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
-            (main_df["RDL"].astype(str) == str(c_rdl)) & 
-            (main_df["Attività"].astype(str) == str(c_att))
-        ]
-        
-        if not matches.empty:
-            orig_idx = matches.index[0]
-            for col in ALL_COLUMNS:
-                if col in edited_row:
-                    val = edited_row[col]
-                    if col in DATE_COLUMNS:
-                        main_df.at[orig_idx, col] = safe_parse_date(val)
-                    elif col == "Ore Valutate":
-                        main_df.at[orig_idx, col] = float(pd.to_numeric(val, errors="coerce") or 0.0)
-                    elif col == "Avanzamento (%)":
-                        main_df.at[orig_idx, col] = int(pd.to_numeric(val, errors="coerce") or 0)
-                    elif col == "Stato":
+    for pos_str, row_changes in edited_rows.items():
+        pos = int(pos_str)
+        if pos < len(current_view_df):
+            target_row = current_view_df.iloc[pos]
+            c_num = target_row["Nr. Commessa"]
+            c_rdl = target_row["RDL"]
+            c_att = target_row.get("Attività", "")
+            
+            matches = main_df[
+                (main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
+                (main_df["RDL"].astype(str) == str(c_rdl)) & 
+                (main_df["Attività"].astype(str) == str(c_att))
+            ]
+            
+            if not matches.empty:
+                orig_idx = matches.index[0]
+                for col_name, new_val in row_changes.items():
+                    if col_name == "Seleziona":
+                        continue
+                    elif col_name in DATE_COLUMNS:
+                        main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
+                    elif col_name == "Ore Valutate":
+                        main_df.at[orig_idx, col_name] = float(pd.to_numeric(new_val, errors="coerce") or 0.0)
+                    elif col_name == "Avanzamento (%)":
+                        main_df.at[orig_idx, col_name] = int(pd.to_numeric(new_val, errors="coerce") or 0)
+                    elif col_name == "Stato":
                         old_st = main_df.at[orig_idx, "Stato"]
-                        main_df.at[orig_idx, col] = str(val)
-                        if val == "Completato" and old_st != "Completato":
+                        main_df.at[orig_idx, col_name] = str(new_val)
+                        if new_val == "Completato" and old_st != "Completato":
                             main_df.at[orig_idx, "Avanzamento (%)"] = 100
                             main_df.at[orig_idx, "Data Chiusura"] = date.today()
-                        elif val != "Completato":
+                        elif new_val != "Completato":
                             main_df.at[orig_idx, "Data Chiusura"] = None
                     else:
-                        main_df.at[orig_idx, col] = str(val) if pd.notnull(val) else ""
+                        main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
+                has_updated = True
 
-    main_df = auto_update_urgency(main_df)
-    st.session_state.main_df = main_df
-    save_data_to_file(main_df)
+    if has_updated:
+        st.session_state.main_df = main_df
+        save_data_to_file(main_df)
+        st.toast("⚡ Modifica salvata automaticamente!", icon="💾")
 
 # --- DIALOG POPUP PER EDITING SCHEDA SINGOLA ---
 @st.dialog("✏️ Scheda Dettaglio & Modifica Commessa", width="large")
@@ -405,7 +412,6 @@ def edit_single_row_dialog(row_dict, orig_index):
             main_df.at[orig_index, "Percorso Cartella"] = percorso_cartella.strip()
             main_df.at[orig_index, "Note"] = note.strip()
             
-            main_df = auto_update_urgency(main_df)
             st.session_state.main_df = main_df
             save_data_to_file(main_df)
             st.toast("✅ Commessa aggiornata con successo!", icon="💾")
@@ -470,7 +476,6 @@ def duplicate_single_row_dialog(row_dict):
             }
             
             main_df = pd.concat([st.session_state.main_df, pd.DataFrame([new_record])], ignore_index=True)
-            main_df = auto_update_urgency(main_df)
             st.session_state.main_df = main_df
             save_data_to_file(main_df)
             st.toast(f"✅ Nuova commessa '{nr_commessa}' creata con successo!", icon="📋")
@@ -657,7 +662,6 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
             })
             
         st.session_state.main_df = pd.concat([st.session_state.main_df, pd.DataFrame(new_rows)], ignore_index=True)
-        st.session_state.main_df = auto_update_urgency(st.session_state.main_df)
         save_data_to_file(st.session_state.main_df)
         st.sidebar.success(f"Aggiunta commessa '{codice}'!")
         st.rerun()
@@ -814,7 +818,9 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_attivi"
+                key="editor_attivi",
+                on_change=handle_editor_change,
+                args=("editor_attivi", view_attivi)
             )
 
             # Rilevamento spunta prima colonna "Seleziona"
@@ -844,12 +850,7 @@ if not df.empty:
                             delete_single_row_dialog(row_selected.to_dict(), orig_index)
 
             st.divider()
-            b0, b1, b2 = st.columns([1.5, 1, 1.3])
-            with b0:
-                if st.button("💾 Salva Modifiche Rapide Celle", key="btn_save_attivi", use_container_width=True):
-                    save_direct_cell_edits(edited_attivi, view_attivi)
-                    st.toast("✅ Modifiche celle salvate con successo!", icon="💾")
-                    st.rerun()
+            b1, b2 = st.columns([1, 1.3])
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button("📥 Scarica Excel", data=excel_data_attivi, file_name=f"Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
@@ -870,7 +871,9 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_completati"
+                key="editor_completati",
+                on_change=handle_editor_change,
+                args=("editor_completati", view_comp)
             )
 
             selected_rows_comp = edited_comp[edited_comp["Seleziona"] == True]
@@ -899,12 +902,7 @@ if not df.empty:
                             delete_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
 
             st.divider()
-            c0, c1, c2 = st.columns([1.5, 1, 1.3])
-            with c0:
-                if st.button("💾 Salva Modifiche Rapide Celle Archivio", key="btn_save_comp", use_container_width=True):
-                    save_direct_cell_edits(edited_comp, view_comp)
-                    st.toast("✅ Modifiche celle salvate con successo!", icon="💾")
-                    st.rerun()
+            c1, c2 = st.columns([1, 1.3])
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button("📥 Scarica Excel", data=excel_data_comp, file_name=f"Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
