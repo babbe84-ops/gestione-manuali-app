@@ -583,7 +583,7 @@ if not df.empty:
             )
         return target_df
 
-    # TUTTI i progetti non completati (inclusi quelli scaduti) restano visibili nella scheda Attività In Corso
+    # TUTTE le attività non completate (incluse le scadute) rimangono rigorosamente nella tabella principale
     df_attivi = prepare_view(df_base[df_base["Stato"] != "Completato"])
     df_completati = prepare_view(df_base[df_base["Stato"] == "Completato"])
 
