@@ -485,7 +485,9 @@ def process_and_save_editor(key_editor, current_view_df):
             if not matches.empty:
                 orig_idx = matches.index[0]
                 for col_name, new_val in changes.items():
-                    if col_name in DATE_COLUMNS:
+                    if col_name == "Seleziona":
+                        continue
+                    elif col_name in DATE_COLUMNS:
                         main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
                     elif col_name == "Ore Valutate":
                         main_df.at[orig_idx, col_name] = float(pd.to_numeric(new_val, errors="coerce") or 0.0)
@@ -780,7 +782,7 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
-# Configurazione Colonne con Checkbox di selezione integrata + SelectboxColumn per Responsabile
+# Configurazione Colonne con Checkbox "📌" posizionata come prima colonna
 col_config = {
     "Seleziona": st.column_config.CheckboxColumn("📌", default=False),
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
@@ -842,7 +844,7 @@ if not df.empty:
                 key="editor_attivi"
             )
 
-            # Rilevamento della spunta sulla casella "Seleziona"
+            # Rilevamento spunta della prima colonna "Seleziona"
             selected_rows = edited_attivi[edited_attivi["Seleziona"] == True]
             if not selected_rows.empty:
                 row_selected = selected_rows.iloc[0]
