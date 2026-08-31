@@ -13,47 +13,120 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLING CSS CLEAN & BUTTONS HI-VIS ---
+# --- STYLING CSS: SAAS MINIMAL CLEAN (OPZIONE 1) ---
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
     .stApp {
-        background-color: #f1f5f9;
+        background-color: #f8fafc;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
+    
+    /* Header Principal */
+    .header-container {
+        background: #ffffff;
+        padding: 1.25rem 1.75rem;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
     .main-title {
-        font-size: 1.8rem;
+        font-size: 1.75rem;
         font-weight: 800;
         color: #0f172a;
-        margin-bottom: 0.1rem;
+        margin-bottom: 0.2rem;
+        letter-spacing: -0.02em;
     }
     .sub-title {
-        font-size: 0.95rem;
-        color: #475569;
-        margin-bottom: 1.2rem;
+        font-size: 0.9rem;
+        color: #64748b;
+        font-weight: 500;
     }
-    .stButton > button {
-        background-color: #2563eb !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        font-size: 0.95rem !important;
-        padding: 0.55rem 1rem !important;
-        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
-    }
-    .stDownloadButton > button {
-        background-color: #0f766e !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        border: none !important;
-    }
+
+    /* KPI Cards Styling */
     div[data-testid="stMetric"] {
         background: #ffffff;
-        border: 1px solid #cbd5e1;
-        border-radius: 10px;
-        padding: 12px 16px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+        position: relative;
+        overflow: hidden;
+    }
+    div[data-testid="stMetric"]::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #4f46e5;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: 0.75rem !important;
+        font-weight: 700 !important;
+        color: #64748b !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 1.8rem !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+    }
+
+    /* Primary Buttons & Actions */
+    .stButton > button {
+        background-color: #4f46e5 !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        padding: 0.55rem 1.1rem !important;
+        box-shadow: 0 2px 4px rgba(79, 70, 229, 0.15) !important;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        background-color: #4338ca !important;
+        box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25) !important;
+    }
+    .stDownloadButton > button {
+        background-color: #0284c7 !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(2, 132, 199, 0.15) !important;
+    }
+
+    /* Tabs Clean Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 45px;
+        border-radius: 8px 8px 0 0;
+        font-weight: 600;
+        color: #64748b;
+        background-color: transparent;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        color: #4f46e5 !important;
+        border-bottom: 2px solid #4f46e5 !important;
+    }
+
+    /* Expander Container */
+    div[data-testid="stExpander"] {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -150,7 +223,6 @@ def auto_update_urgency(dataframe):
             dataframe.at[idx, "Priorità"] = "Normale"
 
         if row.get("Stato") != "Completato":
-            # Usiamo 'Nuova consegna prevista' per determinare l'urgenza
             d_consegna = safe_parse_date(row.get("Nuova consegna prevista"))
             if d_consegna and (d_consegna - today).days <= 14:
                 dataframe.at[idx, "Priorità"] = "🚨 Urgente"
@@ -363,13 +435,13 @@ def generate_printable_html(df_to_print, title):
     return f"""
     <!DOCTYPE html><html><head><meta charset="utf-8"><title>{title}</title>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; color: #333; }}
-        h2 {{ text-align: center; margin-bottom: 5px; }}
+        body {{ font-family: Inter, Arial, sans-serif; margin: 20px; color: #333; }}
+        h2 {{ text-align: center; margin-bottom: 5px; color: #0f172a; }}
         p.date {{ text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }}
         table.print-table {{ width: 100%; border-collapse: collapse; font-size: 11px; }}
-        table.print-table th, table.print-table td {{ border: 1px solid #ccc; padding: 6px 8px; text-align: left; }}
-        table.print-table th {{ background-color: #f2f2f2; font-weight: bold; }}
-        table.print-table tr:nth-child(even) {{ background-color: #f1f5f9; }}
+        table.print-table th, table.print-table td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
+        table.print-table th {{ background-color: #f1f5f9; font-weight: bold; color: #0f172a; }}
+        table.print-table tr:nth-child(even) {{ background-color: #f8fafc; }}
     </style></head>
     <body onload="window.print()"><h2>{title}</h2><p class="date">Data stampa: {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>{html_table}</body></html>
     """
@@ -403,8 +475,12 @@ def export_directly_to_target(df_to_export, filename):
         return False, str(e)
 
 # --- HEADER APP ---
-st.markdown("<div class='main-title'>📚 Gestione Manuali & Commesse</div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-title'>Piattaforma di tracciamento commesse & documentazione tecnica</div>", unsafe_allow_html=True)
+st.markdown("""
+<div class='header-container'>
+    <div class='main-title'>📚 Gestione Manuali & Commesse</div>
+    <div class='sub-title'>Piattaforma di tracciamento commesse & documentazione tecnica</div>
+</div>
+""", unsafe_allow_html=True)
 
 # --- SIDEBAR ---
 st.sidebar.header("⚙️ Opzioni & Colonne")
@@ -476,7 +552,7 @@ if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
 # --- DATAFRAME CORRENTE ---
 df = st.session_state.main_df
 
-# --- ANALISI CRITICITÀ CON AVVISI CLICCABILI (RIFERITI A 'Nuova consegna prevista') ---
+# --- ANALISI CRITICITÀ CON AVVISI CLICCABILI ---
 today_ts = date.today()
 if not df.empty:
     progetti_in_ritardo = df[
@@ -495,16 +571,16 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
     c_warn1, c_warn2 = st.columns(2)
     with c_warn1:
         if not progetti_in_ritardo.empty:
-            st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo** (Clicca per visualizzare)")
+            st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo (Nuova Consegna Superata)**")
             for idx, row in progetti_in_ritardo.iterrows():
                 scad_val = row['Nuova consegna prevista']
                 scad_str = scad_val.strftime('%d/%m/%Y') if isinstance(scad_val, date) else ""
-                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} (Consegna Scaduta: {scad_str})"
+                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} (Consegna: {scad_str})"
                 if st.button(btn_label, key=f"btn_rit_{idx}", use_container_width=True):
                     show_single_row_dialog(row.to_dict())
     with c_warn2:
         if not progetti_urgenti.empty:
-            st.warning(f"🔥 **{len(progetti_urgenti)} Ordini URGENTI in Corso** (Clicca per visualizzare)")
+            st.warning(f"🔥 **{len(progetti_urgenti)} Ordini URGENTI in Corso**")
             for idx, row in progetti_urgenti.iterrows():
                 btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} ({row['Responsabile']})"
                 if st.button(btn_label, key=f"btn_urg_{idx}", use_container_width=True):
@@ -534,7 +610,7 @@ with k3:
         show_kpi_details("Elenco Ordini Confermati", df_conf)
 
 with k4:
-    st.metric(label="Urgenti 🔥", value=len(df_urg))
+    st.metric(label="Urgenti / Scaduti 🔥", value=len(df_urg))
     if st.button("🔥 Apri Urgenti", key="btn_kpi_urg", use_container_width=True):
         show_kpi_details("Elenco Attività Urgenti", df_urg)
 
