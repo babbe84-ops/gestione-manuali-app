@@ -7,13 +7,13 @@ import glob
 import shutil
 
 st.set_page_config(
-    page_title="Gestione Manuali & Commesse", 
+    page_title="SinTec | Gestione Manuali & Commesse", 
     layout="wide", 
-    page_icon="📚",
+    page_icon="⚙️",
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLING AVANZATO: SAAS MINIMAL CLEAN ---
+# --- STYLING BRANDIZATTO SINTEC (DA WWW.SIN-TEC.IT) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -23,46 +23,55 @@ st.markdown("""
     }
     
     .stApp {
-        background-color: #f8fafc !important;
+        background-color: #f4f6f9 !important;
     }
     
-    /* Header Principal SaaS */
-    .saas-header {
-        background: #ffffff;
+    /* Header Brand SinTec */
+    .sintec-header {
+        background: linear-gradient(135deg, #0a2540 0%, #003366 100%);
         padding: 1.5rem 2rem;
-        border-radius: 16px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+        border-radius: 14px;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(10, 37, 64, 0.12);
         margin-bottom: 1.5rem;
+        border-left: 6px solid #00a3e0;
     }
-    .saas-header h1 {
+    .sintec-brand {
+        font-size: 0.85rem;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        color: #00a3e0;
+        text-transform: uppercase;
+        margin-bottom: 0.2rem;
+    }
+    .sintec-header h1 {
         font-size: 1.85rem;
         font-weight: 800;
-        color: #0f172a;
+        color: #ffffff;
         margin: 0;
         letter-spacing: -0.025em;
     }
-    .saas-header p {
-        font-size: 0.92rem;
-        color: #64748b;
-        margin-top: 0.25rem;
-        font-weight: 500;
+    .sintec-header p {
+        font-size: 0.9rem;
+        color: #e2e8f0;
+        margin-top: 0.3rem;
+        font-weight: 400;
     }
 
-    /* KPI Cards SaaS */
+    /* KPI Cards SinTec Style */
     div[data-testid="stMetric"] {
         background: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         padding: 1.1rem 1.3rem !important;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03) !important;
+        box-shadow: 0 4px 10px rgba(10, 37, 64, 0.03) !important;
         position: relative !important;
         overflow: hidden !important;
         transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
     div[data-testid="stMetric"]:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06) !important;
+        box-shadow: 0 6px 14px rgba(10, 37, 64, 0.08) !important;
     }
     div[data-testid="stMetric"]::before {
         content: "";
@@ -71,55 +80,55 @@ st.markdown("""
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, #4f46e5, #0284c7);
+        background: #00a3e0;
     }
     div[data-testid="stMetricLabel"] {
         font-size: 0.72rem !important;
         font-weight: 700 !important;
-        color: #64748b !important;
+        color: #0a2540 !important;
         text-transform: uppercase;
         letter-spacing: 0.06em;
     }
     div[data-testid="stMetricValue"] {
         font-size: 1.9rem !important;
         font-weight: 800 !important;
-        color: #0f172a !important;
+        color: #00a3e0 !important;
     }
 
     /* Data Editor (Tabella Visiva Arrotondata) */
     div[data-testid="stDataEditor"] {
         background-color: #ffffff !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         border: 1px solid #cbd5e1 !important;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
-        padding: 8px !important;
+        box-shadow: 0 4px 12px rgba(10, 37, 64, 0.04) !important;
+        padding: 6px !important;
     }
 
-    /* Pulsanti d'Azione Primaria */
+    /* Pulsanti d'Azione SinTec (Blu/Azzurro) */
     .stButton > button {
-        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+        background: linear-gradient(135deg, #0a2540 0%, #003366 100%) !important;
         color: #ffffff !important;
         border: none !important;
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         font-weight: 600 !important;
-        font-size: 0.92rem !important;
+        font-size: 0.9rem !important;
         padding: 0.6rem 1.25rem !important;
-        box-shadow: 0 3px 8px rgba(79, 70, 229, 0.22) !important;
+        box-shadow: 0 3px 8px rgba(10, 37, 64, 0.2) !important;
         transition: all 0.2s ease !important;
     }
     .stButton > button:hover {
-        background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%) !important;
-        box-shadow: 0 6px 14px rgba(79, 70, 229, 0.32) !important;
+        background: linear-gradient(135deg, #003366 0%, #00a3e0 100%) !important;
+        box-shadow: 0 5px 12px rgba(0, 163, 224, 0.3) !important;
         transform: translateY(-1px);
     }
 
     .stDownloadButton > button {
-        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+        background: linear-gradient(135deg, #00a3e0 0%, #0082b3 100%) !important;
         color: #ffffff !important;
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         font-weight: 600 !important;
         border: none !important;
-        box-shadow: 0 3px 8px rgba(2, 132, 199, 0.22) !important;
+        box-shadow: 0 3px 8px rgba(0, 163, 224, 0.2) !important;
     }
 
     /* Tabs Styling Clean */
@@ -131,7 +140,7 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab"] {
         height: 46px;
-        border-radius: 10px 10px 0 0;
+        border-radius: 8px 8px 0 0;
         font-weight: 600;
         font-size: 0.95rem;
         color: #64748b;
@@ -140,16 +149,16 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
-        color: #4f46e5 !important;
-        border-bottom: 3px solid #4f46e5 !important;
+        color: #0a2540 !important;
+        border-bottom: 3px solid #00a3e0 !important;
     }
 
     /* Container Filtri Expander */
     div[data-testid="stExpander"] {
         background: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
-        border-radius: 14px !important;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.02) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 2px 6px rgba(10, 37, 64, 0.02) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -431,11 +440,11 @@ def generate_printable_html(df_to_print, title):
     <!DOCTYPE html><html><head><meta charset="utf-8"><title>{title}</title>
     <style>
         body {{ font-family: Inter, Arial, sans-serif; margin: 20px; color: #333; }}
-        h2 {{ text-align: center; margin-bottom: 5px; color: #0f172a; }}
+        h2 {{ text-align: center; margin-bottom: 5px; color: #0a2540; }}
         p.date {{ text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }}
         table.print-table {{ width: 100%; border-collapse: collapse; font-size: 11px; }}
         table.print-table th, table.print-table td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
-        table.print-table th {{ background-color: #f1f5f9; font-weight: bold; color: #0f172a; }}
+        table.print-table th {{ background-color: #0a2540; color: #ffffff; font-weight: bold; }}
         table.print-table tr:nth-child(even) {{ background-color: #f8fafc; }}
     </style></head>
     <body onload="window.print()"><h2>{title}</h2><p class="date">Data stampa: {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>{html_table}</body></html>
@@ -451,11 +460,12 @@ def convert_df_to_excel(df_to_export):
         df_clean.to_excel(writer, index=False, sheet_name='Commesse')
     return output.getvalue()
 
-# --- HEADER PRINCIPALE ---
+# --- HEADER SINTEC BRAND ---
 st.markdown("""
-<div class='saas-header'>
-    <h1>📚 Gestione Manuali & Commesse</h1>
-    <p>Piattaforma di tracciamento commesse & documentazione tecnica</p>
+<div class='sintec-header'>
+    <div class='sintec-brand'>SinTec S.r.l. • Soluzioni Tecniche</div>
+    <h1>⚙️ Gestione Manuali & Commesse</h1>
+    <p>Piattaforma operativa per Progettazione Meccanica, Manualistica Tecnica & Documentazione</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -529,7 +539,7 @@ if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
 # --- DATAFRAME CORRENTE ---
 df = st.session_state.main_df
 
-# --- ANALISI CRITICITÀ CON PULSANTI UNICI / BANNER CLICCABILI ---
+# --- ANALISI CRITICITÀ CON BANNER CLICCABILI ---
 today_ts = date.today()
 if not df.empty:
     progetti_in_ritardo = df[
@@ -548,16 +558,16 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
     c_warn1, c_warn2 = st.columns(2)
     with c_warn1:
         if not progetti_in_ritardo.empty:
-            btn_ritardo_label = f"🚨 ATTENZIONE: {len(progetti_in_ritardo)} Commessa/e in Ritardo (Clicca per la tabella completa)"
+            btn_ritardo_label = f"🚨 ATTENZIONE: {len(progetti_in_ritardo)} Commessa/e in Ritardo (Clicca per aprire la tabella)"
             if st.button(btn_ritardo_label, key="btn_open_dialog_ritardi", use_container_width=True):
                 show_kpi_details("🚨 Commesse in Ritardo sulla Nuova Consegna", progetti_in_ritardo)
     with c_warn2:
         if not progetti_urgenti.empty:
-            btn_urgenti_label = f"🔥 URGENTI: {len(progetti_urgenti)} Ordini in Scadenza (Clicca per la tabella completa)"
+            btn_urgenti_label = f"🔥 URGENTI: {len(progetti_urgenti)} Ordini in Scadenza (Clicca per aprire la tabella)"
             if st.button(btn_urgenti_label, key="btn_open_dialog_urgenti", use_container_width=True):
                 show_kpi_details("🔥 Ordini e Commesse Urgenti", progetti_urgenti)
 
-# --- KPI METRICS (4 CARD SAAS MINIMAL) ---
+# --- KPI METRICS SINTEC ---
 k1, k2, k3, k4 = st.columns(4)
 
 df_totale = df.copy() if not df.empty else pd.DataFrame()
