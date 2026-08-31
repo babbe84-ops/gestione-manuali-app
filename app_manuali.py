@@ -780,6 +780,7 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
+# Configurazione Colonne: Responsabile convertito in SelectboxColumn
 col_config = {
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
     "RDL": st.column_config.TextColumn("RDL", pinned=True),
@@ -788,7 +789,7 @@ col_config = {
     "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS, required=True),
     "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS, required=True),
     "Tipo Ordine": st.column_config.SelectboxColumn("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, required=True),
-    "Responsabile": st.column_config.TextColumn("Responsabile Tecnico"),
+    "Responsabile": st.column_config.SelectboxColumn("Responsabile Tecnico", options=TECNICI, required=True),
     "Stato": st.column_config.SelectboxColumn("Stato", options=["Da iniziare", "In corso", "In revisione", "Completato"], required=True),
     "Avanzamento (%)": st.column_config.ProgressColumn("Avanzamento", min_value=0, max_value=100, format="%d%%"),
     "Modelli 3D dal": st.column_config.DateColumn("Modelli 3D dal", format="DD/MM/YYYY"),
@@ -830,25 +831,23 @@ if not df.empty:
         if not df_attivi.empty:
             view_attivi = df_attivi[st.session_state.cols_order].copy()
             
-            # Tabella data_editor per modifica diretta celle + selezione riga
-            edited_attivi = st.data_editor(
+            # DataEditor con selezione nativa integrata
+            editor_attivi_state = st.data_editor(
                 view_attivi,
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row",
                 key="editor_attivi"
             )
 
-            # Rilevamento riga per azioni avanzate (Modifica Scheda / Duplica / Elimina)
-            st.write("💡 *Fai doppio clic sulle celle per modificarle direttamente, oppure seleziona una riga sotto per le azioni avanzate:*")
-            
-            row_labels_attivi = [f"Commessa: {row['Nr. Commessa']} | RDL: {row['RDL']} | Attività: {row['Attività']}" for _, row in view_attivi.iterrows()]
-            selected_label_attivi = st.selectbox("🎯 Seleziona riga per opzioni avanzate (Scheda / Duplica / Elimina):", options=["-- Nessuna riga selezionata --"] + row_labels_attivi, key="sb_attivi")
-            
-            if selected_label_attivi != "-- Nessuna riga selezionata --":
-                sel_index = row_labels_attivi.index(selected_label_attivi)
-                row_selected = view_attivi.iloc[sel_index]
+            # Controllo se l'utente ha spuntato una riga nella tabella
+            selected_rows = editor_attivi_state.get("selection", {}).get("rows", [])
+            if selected_rows:
+                sel_idx = selected_rows[0]
+                row_selected = view_attivi.iloc[sel_idx]
                 
                 c_num = row_selected["Nr. Commessa"]
                 c_rdl = row_selected["RDL"]
@@ -861,6 +860,7 @@ if not df.empty:
                 if not orig_matches.empty:
                     orig_index = orig_matches.index[0]
                     
+                    st.write(f"📍 **Riga Selezionata:** Commessa **{c_num}** - *{c_rdl}*")
                     col_action1, col_action2, col_action3 = st.columns(3)
                     with col_action1:
                         if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_attivi", use_container_width=True):
@@ -896,23 +896,21 @@ if not df.empty:
         if not df_completati.empty:
             view_comp = df_completati[st.session_state.cols_order].copy()
             
-            edited_comp = st.data_editor(
+            editor_comp_state = st.data_editor(
                 view_comp,
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row",
                 key="editor_completati"
             )
 
-            st.write("💡 *Fai doppio clic sulle celle per modificarle direttamente, oppure seleziona una riga sotto per le azioni avanzate:*")
-            
-            row_labels_comp = [f"Commessa: {row['Nr. Commessa']} | RDL: {row['RDL']} | Attività: {row['Attività']}" for _, row in view_comp.iterrows()]
-            selected_label_comp = st.selectbox("🎯 Seleziona riga per opzioni avanzate (Scheda / Duplica / Elimina):", options=["-- Nessuna riga selezionata --"] + row_labels_comp, key="sb_comp")
-
-            if selected_label_comp != "-- Nessuna riga selezionata --":
-                sel_index_comp = row_labels_comp.index(selected_label_comp)
-                row_selected_comp = view_comp.iloc[sel_index_comp]
+            selected_rows_comp = editor_comp_state.get("selection", {}).get("rows", [])
+            if selected_rows_comp:
+                sel_idx_comp = selected_rows_comp[0]
+                row_selected_comp = view_comp.iloc[sel_idx_comp]
                 
                 c_num = row_selected_comp["Nr. Commessa"]
                 c_rdl = row_selected_comp["RDL"]
@@ -925,6 +923,7 @@ if not df.empty:
                 if not orig_matches_comp.empty:
                     orig_index_comp = orig_matches_comp.index[0]
                     
+                    st.write(f"📍 **Riga Selezionata:** Commessa **{c_num}** - *{c_rdl}*")
                     col_action_comp1, col_action_comp2, col_action_comp3 = st.columns(3)
                     with col_action_comp1:
                         if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_comp", use_container_width=True):
