@@ -182,26 +182,23 @@ def save_data_to_file(df_to_save):
     create_automatic_backup()
     df_disk = df_to_save[ALL_COLUMNS].copy()
     for dcol in DATE_COLUMNS:
-        df_disk[dcol] = df_disk[dcol].apply(lambda x: x.strftime('%Y-%m-%d') if isinstance(x, (date, datetime)) else "")
+        df_disk[dcol] = df_disk[dcol].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, (date, datetime)) else "")
     df_disk.to_csv(DB_FILE, index=False)
 
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
 def process_and_save_editor(key_editor, current_view_df):
-    """Mappatura esatta tra gli indici dell'editor visivo e il dataframe su disco CSV"""
     editor_state = st.session_state.get(key_editor, {})
     main_df = st.session_state.main_df.copy()
     has_changes = False
 
-    # 1. Cancellazione righe
     deleted_positions = editor_state.get("deleted_rows", [])
     if deleted_positions:
         indices_to_drop = current_view_df.iloc[deleted_positions].index
         main_df = main_df.drop(index=indices_to_drop, errors="ignore")
         has_changes = True
 
-    # 2. Modifica celle
     edited_rows = editor_state.get("edited_rows", {})
     if edited_rows:
         for pos_str, changes in edited_rows.items():
@@ -227,7 +224,6 @@ def process_and_save_editor(key_editor, current_view_df):
                         main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
                 has_changes = True
 
-    # 3. Nuove righe
     added_rows = editor_state.get("added_rows", [])
     if added_rows:
         new_records = []
@@ -271,6 +267,69 @@ def show_kpi_details(title, sub_df):
             hide_index=True,
             column_config=dialog_col_config
         )
+
+@st.dialog("🔍 Dettaglio Singola Commessa", width="large")
+def show_single_row_dialog(row_data):
+    st.subheader(f"Commessa: {row_data.get('Nr. Commessa', '')} - {row_data.get('RDL', '')}")
+    df_single = pd.DataFrame([row_data])
+    
+    display_cols = [
+        "Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", 
+        "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", 
+        "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur", "Percorso Cartella", "Note"
+    ]
+    cols_to_show = [c for c in display_cols if c in df_single.columns]
+    
+    dialog_col_config = {
+        "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
+        "Modelli 3D dal": st.column_config.DateColumn("Modelli 3D dal", format="DD/MM/YYYY"),
+        "Scadenza Prevista": st.column_config.DateColumn("Scadenza Prevista", format="DD/MM/YYYY"),
+        "Spedizione Wittur": st.column_config.DateColumn("Spedizione Wittur", format="DD/MM/YYYY"),
+        "Data Chiusura": st.column_config.DateColumn("Data Chiusura", format="DD/MM/YYYY"),
+    }
+    
+    st.dataframe(
+        df_single[cols_to_show], 
+        use_container_width=True, 
+        hide_index=True,
+        column_config=dialog_col_config
+    )
+
+@st.dialog("🔄 Ripristina Backup")
+def restore_backup_dialog():
+    backup_files = sorted(glob.glob(os.path.join(BACKUP_DIR, "manuali_progetti_db_*.csv")), reverse=True)
+    if not backup_files:
+        st.info("Nessun backup disponibile.")
+        return
+
+    options = {}
+    for f in backup_files:
+        filename = os.path.basename(f)
+        try:
+            raw_ts = filename.replace("manuali_progetti_db_", "").replace(".csv", "")
+            dt_obj = datetime.strptime(raw_ts, "%Y%m%d_%H%M%S")
+            label = dt_obj.strftime("Backup del %d/%m/%Y ore %H:%M:%S")
+        except Exception:
+            label = filename
+        options[label] = f
+
+    selected_label = st.selectbox("Seleziona versione:", list(options.keys()))
+    selected_file = options[selected_label]
+
+    st.warning("⚠️ **ATTENZIONE:** Il ripristino sovrascriverà i dati attuali!")
+    
+    col_confirm, col_cancel = st.columns(2)
+    with col_confirm:
+        if st.button("🔴 Conferma Ripristino", type="primary", use_container_width=True):
+            create_automatic_backup()
+            shutil.copy(selected_file, DB_FILE)
+            st.session_state.main_df = load_data()
+            st.toast("✅ Database ripristinato!", icon="🔄")
+            st.rerun()
+            
+    with col_cancel:
+        if st.button("Annulla", use_container_width=True):
+            st.rerun()
 
 def generate_printable_html(df_to_print, title):
     cols = ["Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur"]
@@ -388,10 +447,14 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
         st.sidebar.success(f"Aggiunta commessa '{codice}'!")
         st.rerun()
 
+st.sidebar.divider()
+if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
+    restore_backup_dialog()
+
 # --- DATAFRAME CORRENTE ---
 df = st.session_state.main_df
 
-# --- ANALISI CRITICITÀ ---
+# --- ANALISI CRITICITÀ CON AVVISI CLICCABILI ---
 today_ts = date.today()
 if not df.empty:
     progetti_in_ritardo = df[(df["Stato"] != "Completato") & (df["Scadenza Prevista"].apply(lambda x: isinstance(x, date) and x < today_ts))]
@@ -404,16 +467,20 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
     c_warn1, c_warn2 = st.columns(2)
     with c_warn1:
         if not progetti_in_ritardo.empty:
-            st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo**")
+            st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo** (Clicca per visualizzare)")
             for idx, row in progetti_in_ritardo.iterrows():
                 scad_val = row['Scadenza Prevista']
                 scad_str = scad_val.strftime('%d/%m/%Y') if isinstance(scad_val, date) else ""
-                st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} (Scaduta: {scad_str})")
+                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} (Scaduta: {scad_str})"
+                if st.button(btn_label, key=f"btn_rit_{idx}", use_container_width=True):
+                    show_single_row_dialog(row.to_dict())
     with c_warn2:
         if not progetti_urgenti.empty:
-            st.warning(f"🔥 **{len(progetti_urgenti)} Ordini URGENTI in Corso**")
+            st.warning(f"🔥 **{len(progetti_urgenti)} Ordini URGENTI in Corso** (Clicca per visualizzare)")
             for idx, row in progetti_urgenti.iterrows():
-                st.caption(f"• **{row['Nr. Commessa']}** - {row['RDL']} ({row['Responsabile']})")
+                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} ({row['Responsabile']})"
+                if st.button(btn_label, key=f"btn_urg_{idx}", use_container_width=True):
+                    show_single_row_dialog(row.to_dict())
 
 # --- KPI METRICS ---
 k1, k2, k3, k4 = st.columns(4)
@@ -516,6 +583,7 @@ if not df.empty:
             )
         return target_df
 
+    # TUTTI i progetti non completati (inclusi quelli scaduti) restano visibili nella scheda Attività In Corso
     df_attivi = prepare_view(df_base[df_base["Stato"] != "Completato"])
     df_completati = prepare_view(df_base[df_base["Stato"] == "Completato"])
 
@@ -543,15 +611,15 @@ if not df.empty:
                     st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
-                st.download_button("📥 Scarica Excel", data=excel_data_attivi, file_name=f"Attivita_In_Corso_{date.today()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                st.download_button("📥 Scarica Excel", data=excel_data_attivi, file_name=f"Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             with b2:
                 if st.button("📁 Salva in Wittur", key="btn_wittur_attivi", use_container_width=True):
-                    ok, res = export_directly_to_target(df_attivi, f"Attivita_In_Corso_{date.today()}.xlsx")
+                    ok, res = export_directly_to_target(df_attivi, f"Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.xlsx")
                     if ok: st.success(f"Salvato in {TARGET_FOLDER}")
                     else: st.error(f"Errore: {res}")
             with b3:
                 html_print_attivi = generate_printable_html(df_attivi, "Tabella Attività In Corso")
-                st.download_button("🖨️ Stampa / PDF", data=html_print_attivi, file_name=f"Stampa_Attivita_In_Corso_{date.today()}.html", mime="text/html", use_container_width=True)
+                st.download_button("🖨️ Stampa / PDF", data=html_print_attivi, file_name=f"Stampa_Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.html", mime="text/html", use_container_width=True)
         else:
             st.info("Nessuna attività in corso con i filtri selezionati.")
 
@@ -579,15 +647,15 @@ if not df.empty:
                     st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
-                st.download_button("📥 Scarica Excel", data=excel_data_comp, file_name=f"Archivio_Completati_{date.today()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                st.download_button("📥 Scarica Excel", data=excel_data_comp, file_name=f"Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             with c2:
                 if st.button("📁 Salva in Wittur", key="btn_wittur_comp", use_container_width=True):
-                    ok, res = export_directly_to_target(df_completati, f"Archivio_Completati_{date.today()}.xlsx")
+                    ok, res = export_directly_to_target(df_completati, f"Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.xlsx")
                     if ok: st.success(f"Salvato in {TARGET_FOLDER}")
                     else: st.error(f"Errore: {res}")
             with c3:
                 html_print_comp = generate_printable_html(df_completati, "Tabella Attività Completate")
-                st.download_button("🖨️ Stampa / PDF", data=html_print_comp, file_name=f"Stampa_Archivio_Completati_{date.today()}.html", mime="text/html", use_container_width=True)
+                st.download_button("🖨️ Stampa / PDF", data=html_print_comp, file_name=f"Stampa_Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.html", mime="text/html", use_container_width=True)
         else:
             st.info("Nessuna attività completata con i filtri selezionati.")
 
