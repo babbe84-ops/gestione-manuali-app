@@ -189,22 +189,43 @@ if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
 def process_and_save_editor(key_editor, current_view_df):
+    """Salvataggio robusto basato su ricerca univoca di Commessa e RDL (senza errori di indice)"""
     editor_state = st.session_state.get(key_editor, {})
     main_df = st.session_state.main_df.copy()
     has_changes = False
 
+    # 1. Cancellazione righe
     deleted_positions = editor_state.get("deleted_rows", [])
     if deleted_positions:
-        indices_to_drop = current_view_df.iloc[deleted_positions].index
-        main_df = main_df.drop(index=indices_to_drop, errors="ignore")
-        has_changes = True
+        for pos in deleted_positions:
+            target_row = current_view_df.iloc[pos]
+            c_num = target_row["Nr. Commessa"]
+            c_rdl = target_row["RDL"]
+            c_att = target_row.get("Attività", "")
+            
+            mask = (main_df["Nr. Commessa"].astype(str) == str(c_num)) & \
+                   (main_df["RDL"].astype(str) == str(c_rdl)) & \
+                   (main_df["Attività"].astype(str) == str(c_att))
+            main_df = main_df[~mask]
+            has_changes = True
 
+    # 2. Modifica celle
     edited_rows = editor_state.get("edited_rows", {})
     if edited_rows:
         for pos_str, changes in edited_rows.items():
             pos = int(pos_str) if isinstance(pos_str, str) else pos_str
-            orig_idx = current_view_df.index[pos]
-            if orig_idx in main_df.index:
+            target_row = current_view_df.iloc[pos]
+            c_num = target_row["Nr. Commessa"]
+            c_rdl = target_row["RDL"]
+            c_att = target_row.get("Attività", "")
+
+            # Troviamo l'indice reale nel dataframe principale
+            matches = main_df[(main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
+                              (main_df["RDL"].astype(str) == str(c_rdl)) & 
+                              (main_df["Attività"].astype(str) == str(c_att))]
+            
+            if not matches.empty:
+                orig_idx = matches.index[0]
                 for col_name, new_val in changes.items():
                     if col_name in DATE_COLUMNS:
                         main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
@@ -224,6 +245,7 @@ def process_and_save_editor(key_editor, current_view_df):
                         main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
                 has_changes = True
 
+    # 3. Nuove righe
     added_rows = editor_state.get("added_rows", [])
     if added_rows:
         new_records = []
@@ -583,7 +605,6 @@ if not df.empty:
             )
         return target_df
 
-    # TUTTE le attività non completate (incluse le scadute) rimangono rigorosamente nella tabella principale
     df_attivi = prepare_view(df_base[df_base["Stato"] != "Completato"])
     df_completati = prepare_view(df_base[df_base["Stato"] == "Completato"])
 
