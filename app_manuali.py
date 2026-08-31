@@ -13,47 +13,57 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLING CSS: SAAS MINIMAL CLEAN (OPZIONE 1) ---
+# --- STYLING AVANZATO: SAAS MINIMAL CLEAN (OPZIONE 1 ESATTA) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     
-    .stApp {
-        background-color: #f8fafc;
+    html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
-    /* Header Principal */
-    .header-container {
-        background: #ffffff;
-        padding: 1.25rem 1.75rem;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    /* Sfondo App */
+    .stApp {
+        background-color: #f8fafc !important;
     }
-    .main-title {
-        font-size: 1.75rem;
+    
+    /* Header Principal SaaS */
+    .saas-header {
+        background: #ffffff;
+        padding: 1.5rem 2rem;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+        margin-bottom: 1.5rem;
+    }
+    .saas-header h1 {
+        font-size: 1.85rem;
         font-weight: 800;
         color: #0f172a;
-        margin-bottom: 0.2rem;
-        letter-spacing: -0.02em;
+        margin: 0;
+        letter-spacing: -0.025em;
     }
-    .sub-title {
-        font-size: 0.9rem;
+    .saas-header p {
+        font-size: 0.92rem;
         color: #64748b;
+        margin-top: 0.25rem;
         font-weight: 500;
     }
 
-    /* KPI Cards Styling */
+    /* KPI Cards SaaS (Bordi Arrotondati + Striscia Colorata) */
     div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1rem 1.25rem;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-        position: relative;
-        overflow: hidden;
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 14px !important;
+        padding: 1.1rem 1.3rem !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06) !important;
     }
     div[data-testid="stMetric"]::before {
         content: "";
@@ -62,71 +72,107 @@ st.markdown("""
         left: 0;
         right: 0;
         height: 4px;
-        background: #4f46e5;
+        background: linear-gradient(90deg, #4f46e5, #0284c7);
     }
     div[data-testid="stMetricLabel"] {
-        font-size: 0.75rem !important;
+        font-size: 0.72rem !important;
         font-weight: 700 !important;
         color: #64748b !important;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
     }
     div[data-testid="stMetricValue"] {
-        font-size: 1.8rem !important;
+        font-size: 1.9rem !important;
         font-weight: 800 !important;
         color: #0f172a !important;
     }
 
-    /* Primary Buttons & Actions */
-    .stButton > button {
-        background-color: #4f46e5 !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-        padding: 0.55rem 1.1rem !important;
-        box-shadow: 0 2px 4px rgba(79, 70, 229, 0.15) !important;
-        transition: all 0.2s ease;
+    /* Banner Avvisi Scadenze */
+    .saas-alert-danger {
+        background-color: #fef2f2;
+        border: 1px solid #fca5a5;
+        border-radius: 12px;
+        padding: 0.9rem 1.25rem;
+        margin-bottom: 1rem;
+        color: #991b1b;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.04);
     }
-    .stButton > button:hover {
-        background-color: #4338ca !important;
-        box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25) !important;
-    }
-    .stDownloadButton > button {
-        background-color: #0284c7 !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        border: none !important;
-        box-shadow: 0 2px 4px rgba(2, 132, 199, 0.15) !important;
+    .saas-alert-warning {
+        background-color: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 12px;
+        padding: 0.9rem 1.25rem;
+        margin-bottom: 1rem;
+        color: #92400e;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(217, 119, 6, 0.04);
     }
 
-    /* Tabs Clean Styling */
+    /* Data Editor (Tabella Visiva Arrotondata) */
+    div[data-testid="stDataEditor"] {
+        background-color: #ffffff !important;
+        border-radius: 14px !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
+        padding: 8px !important;
+    }
+
+    /* Pulsanti d'Azione Primaria */
+    .stButton > button {
+        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        font-size: 0.92rem !important;
+        padding: 0.6rem 1.25rem !important;
+        box-shadow: 0 3px 8px rgba(79, 70, 229, 0.22) !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%) !important;
+        box-shadow: 0 6px 14px rgba(79, 70, 229, 0.32) !important;
+        transform: translateY(-1px);
+    }
+
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+        color: #ffffff !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        border: none !important;
+        box-shadow: 0 3px 8px rgba(2, 132, 199, 0.22) !important;
+    }
+
+    /* Tabs Styling Clean */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 10px;
         background-color: transparent;
         border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 1rem;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 45px;
-        border-radius: 8px 8px 0 0;
+        height: 46px;
+        border-radius: 10px 10px 0 0;
         font-weight: 600;
+        font-size: 0.95rem;
         color: #64748b;
         background-color: transparent;
+        padding: 0 1.25rem;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
         color: #4f46e5 !important;
-        border-bottom: 2px solid #4f46e5 !important;
+        border-bottom: 3px solid #4f46e5 !important;
     }
 
-    /* Expander Container */
+    /* Container Filtri Expander */
     div[data-testid="stExpander"] {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.02) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -474,11 +520,11 @@ def export_directly_to_target(df_to_export, filename):
     except Exception as e:
         return False, str(e)
 
-# --- HEADER APP ---
+# --- HEADER PRINCIPALE ESATTO ---
 st.markdown("""
-<div class='header-container'>
-    <div class='main-title'>📚 Gestione Manuali & Commesse</div>
-    <div class='sub-title'>Piattaforma di tracciamento commesse & documentazione tecnica</div>
+<div class='saas-header'>
+    <h1>📚 Gestione Manuali & Commesse</h1>
+    <p>Piattaforma di tracciamento commesse & documentazione tecnica</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -552,7 +598,7 @@ if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
 # --- DATAFRAME CORRENTE ---
 df = st.session_state.main_df
 
-# --- ANALISI CRITICITÀ CON AVVISI CLICCABILI ---
+# --- ANALISI CRITICITÀ CON BANNER ALLINEATI ALL'IMMAGINE ---
 today_ts = date.today()
 if not df.empty:
     progetti_in_ritardo = df[
@@ -571,7 +617,11 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
     c_warn1, c_warn2 = st.columns(2)
     with c_warn1:
         if not progetti_in_ritardo.empty:
-            st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo (Nuova Consegna Superata)**")
+            st.markdown(f"""
+            <div class='saas-alert-danger'>
+                🚨 <b>{len(progetti_in_ritardo)} Attività in Ritardo</b> (Nuova Consegna Prevista superata)
+            </div>
+            """, unsafe_allow_html=True)
             for idx, row in progetti_in_ritardo.iterrows():
                 scad_val = row['Nuova consegna prevista']
                 scad_str = scad_val.strftime('%d/%m/%Y') if isinstance(scad_val, date) else ""
@@ -580,13 +630,17 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
                     show_single_row_dialog(row.to_dict())
     with c_warn2:
         if not progetti_urgenti.empty:
-            st.warning(f"🔥 **{len(progetti_urgenti)} Ordini URGENTI in Corso**")
+            st.markdown(f"""
+            <div class='saas-alert-warning'>
+                🔥 <b>{len(progetti_urgenti)} Ordini URGENTI</b> in lavorazione
+            </div>
+            """, unsafe_allow_html=True)
             for idx, row in progetti_urgenti.iterrows():
                 btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} ({row['Responsabile']})"
                 if st.button(btn_label, key=f"btn_urg_{idx}", use_container_width=True):
                     show_single_row_dialog(row.to_dict())
 
-# --- KPI METRICS ---
+# --- KPI METRICS (4 CARD SAAS MINIMAL) ---
 k1, k2, k3, k4 = st.columns(4)
 
 df_totale = df.copy() if not df.empty else pd.DataFrame()
@@ -595,22 +649,22 @@ df_conf = df[df["Tipo Ordine"] == "Confermato"].copy() if not df.empty else pd.D
 df_urg = df[(df["Priorità"].str.contains("Urgente", case=False, na=False)) & (df["Stato"] != "Completato")].copy() if not df.empty else pd.DataFrame()
 
 with k1:
-    st.metric(label="Totale Attività", value=len(df_totale))
+    st.metric(label="TOTALE ATTIVITÀ", value=len(df_totale))
     if st.button("🔍 Apri Totali", key="btn_kpi_tot", use_container_width=True):
         show_kpi_details("Tutte le Attività", df_totale)
 
 with k2:
-    st.metric(label="Preventivi 📋", value=len(df_prev))
+    st.metric(label="PREVENTIVI 📋", value=len(df_prev))
     if st.button("📋 Apri Preventivi", key="btn_kpi_prev", use_container_width=True):
         show_kpi_details("Elenco Preventivi", df_prev)
 
 with k3:
-    st.metric(label="Confermati ✅", value=len(df_conf))
+    st.metric(label="CONFERMATI ✅", value=len(df_conf))
     if st.button("✅ Apri Confermati", key="btn_kpi_conf", use_container_width=True):
         show_kpi_details("Elenco Ordini Confermati", df_conf)
 
 with k4:
-    st.metric(label="Urgenti / Scaduti 🔥", value=len(df_urg))
+    st.metric(label="URGENTI / SCADUTI 🔥", value=len(df_urg))
     if st.button("🔥 Apri Urgenti", key="btn_kpi_urg", use_container_width=True):
         show_kpi_details("Elenco Attività Urgenti", df_urg)
 
@@ -648,7 +702,7 @@ tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso",
 col_config = {
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
     "RDL": st.column_config.TextColumn("RDL", pinned=True),
-    "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
+    "Nuova consegna prevista": st.column_config.DateColumn("Nuova Consegna", format="DD/MM/YYYY"),
     "Descrizione": st.column_config.TextColumn("Descrizione"),
     "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS, required=True),
     "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS, required=True),
