@@ -157,7 +157,6 @@ st.markdown("""
 DB_FILE = "manuali_progetti_db.csv"
 BACKUP_DIR = "backups"
 MAX_BACKUPS = 100
-TARGET_FOLDER = r"X:\caselli\Wittur\MANUALI DA FARE"
 
 TECNICI = [
     "Non ancora assegnato",
@@ -452,24 +451,6 @@ def convert_df_to_excel(df_to_export):
         df_clean.to_excel(writer, index=False, sheet_name='Commesse')
     return output.getvalue()
 
-def export_directly_to_target(df_to_export, filename):
-    if not os.path.exists(TARGET_FOLDER):
-        try:
-            os.makedirs(TARGET_FOLDER)
-        except Exception as e:
-            return False, f"Impossibile accedere alla cartella: {e}"
-    file_path = os.path.join(TARGET_FOLDER, filename)
-    df_clean = df_to_export[[c for c in ALL_COLUMNS if c in df_to_export.columns]].copy()
-    for dcol in DATE_COLUMNS:
-        if dcol in df_clean.columns:
-            df_clean[dcol] = df_clean[dcol].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, (date, datetime)) else "")
-    try:
-        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-            df_clean.to_excel(writer, index=False, sheet_name='Commesse')
-        return True, file_path
-    except Exception as e:
-        return False, str(e)
-
 # --- HEADER PRINCIPALE ---
 st.markdown("""
 <div class='saas-header'>
@@ -693,7 +674,7 @@ if not df.empty:
                 key="editor_attivi"
             )
 
-            b0, b1, b2, b3 = st.columns([1.5, 1, 1.2, 1.3])
+            b0, b1, b2 = st.columns([1.5, 1, 1.3])
             with b0:
                 if st.button("💾 Salva Modifiche", key="btn_save_attivi", use_container_width=True):
                     saved = process_and_save_editor("editor_attivi", view_attivi)
@@ -706,11 +687,6 @@ if not df.empty:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button("📥 Scarica Excel", data=excel_data_attivi, file_name=f"Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             with b2:
-                if st.button("📁 Salva in Wittur", key="btn_wittur_attivi", use_container_width=True):
-                    ok, res = export_directly_to_target(df_attivi, f"Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.xlsx")
-                    if ok: st.success(f"Salvato in {TARGET_FOLDER}")
-                    else: st.error(f"Errore: {res}")
-            with b3:
                 html_print_attivi = generate_printable_html(df_attivi, "Tabella Attività In Corso")
                 st.download_button("🖨️ Stampa / PDF", data=html_print_attivi, file_name=f"Stampa_Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.html", mime="text/html", use_container_width=True)
         else:
@@ -729,7 +705,7 @@ if not df.empty:
                 key="editor_completati"
             )
 
-            c0, c1, c2, c3 = st.columns([1.5, 1, 1.2, 1.3])
+            c0, c1, c2 = st.columns([1.5, 1, 1.3])
             with c0:
                 if st.button("💾 Salva Modifiche Archivio", key="btn_save_comp", use_container_width=True):
                     saved = process_and_save_editor("editor_completati", view_comp)
@@ -742,11 +718,6 @@ if not df.empty:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button("📥 Scarica Excel", data=excel_data_comp, file_name=f"Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             with c2:
-                if st.button("📁 Salva in Wittur", key="btn_wittur_comp", use_container_width=True):
-                    ok, res = export_directly_to_target(df_completati, f"Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.xlsx")
-                    if ok: st.success(f"Salvato in {TARGET_FOLDER}")
-                    else: st.error(f"Errore: {res}")
-            with c3:
                 html_print_comp = generate_printable_html(df_completati, "Tabella Attività Completate")
                 st.download_button("🖨️ Stampa / PDF", data=html_print_comp, file_name=f"Stampa_Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.html", mime="text/html", use_container_width=True)
         else:
