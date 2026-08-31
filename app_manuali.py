@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLING BRANDIZATTO SINTEC (DA WWW.SIN-TEC.IT) ---
+# --- STYLING BRANDIZZATO SINTEC (DA WWW.SIN-TEC.IT) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -95,8 +95,8 @@ st.markdown("""
         color: #00a3e0 !important;
     }
 
-    /* Data Editor (Tabella Visiva Arrotondata) */
-    div[data-testid="stDataEditor"] {
+    /* Styling Tabelle / Dataframes */
+    div[data-testid="stDataEditor"], div[data-testid="stDataFrame"] {
         background-color: #ffffff !important;
         border-radius: 12px !important;
         border: 1px solid #cbd5e1 !important;
@@ -295,6 +295,76 @@ def save_data_to_file(df_to_save):
 
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
+
+# --- DIALOG POPUP PER EDITING SCHEDA SINGOLA ---
+@st.dialog("✏️ Scheda Dettaglio & Modifica Commessa", width="large")
+def edit_single_row_dialog(row_dict, orig_index):
+    st.write(f"Modifica dettagliata per **Commessa: {row_dict.get('Nr. Commessa', '')}** | **RDL: {row_dict.get('RDL', '')}**")
+    
+    with st.form("form_edit_row_dialog"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nr_commessa = st.text_input("Nr. Commessa", value=str(row_dict.get("Nr. Commessa", "")))
+            rdl = st.text_input("RDL / Titolo", value=str(row_dict.get("RDL", "")))
+            descrizione = st.text_input("Descrizione", value=str(row_dict.get("Descrizione", "")))
+            tipo_ord = st.selectbox("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(row_dict.get("Tipo Ordine")) if row_dict.get("Tipo Ordine") in TIPO_ORDINE_OPTIONS else 1)
+            attivita = st.selectbox("Attività", options=ATTIVITA_OPTIONS, index=ATTIVITA_OPTIONS.index(row_dict.get("Attività")) if row_dict.get("Attività") in ATTIVITA_OPTIONS else 0)
+            priorita = st.selectbox("Priorità", options=PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(row_dict.get("Priorità")) if row_dict.get("Priorità") in PRIORITA_OPTIONS else 1)
+            ore_val = st.number_input("Ore Valutate", value=float(row_dict.get("Ore Valutate", 0.0)), step=0.5)
+
+        with col2:
+            resp_curr = [r.strip() for r in str(row_dict.get("Responsabile", "")).split(",") if r.strip() in TECNICI]
+            responsabile_sel = st.multiselect("Responsabili Tecnici", options=TECNICI, default=resp_curr if resp_curr else ["Non ancora assegnato"])
+            stato = st.selectbox("Stato", options=["Da iniziare", "In corso", "In revisione", "Completato"], index=["Da iniziare", "In corso", "In revisione", "Completato"].index(row_dict.get("Stato")) if row_dict.get("Stato") in ["Da iniziare", "In corso", "In revisione", "Completato"] else 0)
+            avanzamento = st.slider("Avanzamento (%)", 0, 100, int(row_dict.get("Avanzamento (%)", 0)))
+            
+            d_3d = safe_parse_date(row_dict.get("Modelli 3D dal")) or date.today()
+            d_scad = safe_parse_date(row_dict.get("Scadenza Prevista")) or date.today()
+            d_nconsegna = safe_parse_date(row_dict.get("Nuova consegna prevista")) or date.today()
+            d_wittur = safe_parse_date(row_dict.get("Spedizione Wittur")) or date.today()
+            
+            modelli_3d_dal = st.date_input("Modelli 3D dal", value=d_3d, format="DD/MM/YYYY")
+            scadenza_prev = st.date_input("Scadenza Prevista", value=d_scad, format="DD/MM/YYYY")
+            nuova_consegna = st.date_input("Nuova Consegna Prevista", value=d_nconsegna, format="DD/MM/YYYY")
+            spedizione_wittur = st.date_input("Spedizione Wittur", value=d_wittur, format="DD/MM/YYYY")
+
+        st.divider()
+        percorso_cartella = st.text_input("Percorso Cartella Locale", value=str(row_dict.get("Percorso Cartella", "")))
+        note = st.text_area("Note / Osservazioni", value=str(row_dict.get("Note", "")))
+        
+        save_btn = st.form_submit_button("💾 Salva Modifiche Commessa", use_container_width=True)
+        if save_btn:
+            main_df = st.session_state.main_df
+            main_df.at[orig_index, "Nr. Commessa"] = nr_commessa.strip()
+            main_df.at[orig_index, "RDL"] = rdl.strip()
+            main_df.at[orig_index, "Descrizione"] = descrizione.strip()
+            main_df.at[orig_index, "Tipo Ordine"] = tipo_ord
+            main_df.at[orig_index, "Attività"] = attivita
+            main_df.at[orig_index, "Priorità"] = priorita
+            main_df.at[orig_index, "Ore Valutate"] = float(ore_val)
+            main_df.at[orig_index, "Responsabile"] = ", ".join(responsabile_sel) if responsabile_sel else "Non ancora assegnato"
+            
+            old_st = main_df.at[orig_index, "Stato"]
+            main_df.at[orig_index, "Stato"] = stato
+            if stato == "Completato" and old_st != "Completato":
+                main_df.at[orig_index, "Avanzamento (%)"] = 100
+                main_df.at[orig_index, "Data Chiusura"] = date.today()
+            elif stato != "Completato":
+                main_df.at[orig_index, "Avanzamento (%)"] = avanzamento
+                main_df.at[orig_index, "Data Chiusura"] = None
+
+            main_df.at[orig_index, "Modelli 3D dal"] = modelli_3d_dal
+            main_df.at[orig_index, "Scadenza Prevista"] = scadenza_prev
+            main_df.at[orig_index, "Nuova consegna prevista"] = nuova_consegna
+            main_df.at[orig_index, "Spedizione Wittur"] = spedizione_wittur
+            main_df.at[orig_index, "Percorso Cartella"] = percorso_cartella.strip()
+            main_df.at[orig_index, "Note"] = note.strip()
+            
+            main_df = auto_update_urgency(main_df)
+            st.session_state.main_df = main_df
+            save_data_to_file(main_df)
+            st.toast("✅ Commessa aggiornata con successo!", icon="💾")
+            st.rerun()
 
 def process_and_save_editor(key_editor, current_view_df):
     editor_state = st.session_state.get(key_editor, {})
@@ -675,19 +745,44 @@ if not df.empty:
     with tab_operativa:
         if not df_attivi.empty:
             view_attivi = df_attivi[st.session_state.cols_order].copy()
-            st.data_editor(
+            
+            # Tabella interattiva con selezione riga
+            selection = st.dataframe(
                 view_attivi,
-                num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_attivi"
+                on_select="rerun",
+                selection_mode="single-row",
+                key="table_attivi"
             )
 
+            # Controllo se l'utente ha selezionato una riga
+            selected_rows = selection.get("selection", {}).get("rows", [])
+            if selected_rows:
+                selected_idx = selected_rows[0]
+                row_selected = view_attivi.iloc[selected_idx]
+                
+                # Troviamo l'indice originale nel dataframe principale per il salvataggio
+                c_num = row_selected["Nr. Commessa"]
+                c_rdl = row_selected["RDL"]
+                c_att = row_selected.get("Attività", "")
+                orig_matches = st.session_state.main_df[
+                    (st.session_state.main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
+                    (st.session_state.main_df["RDL"].astype(str) == str(c_rdl)) & 
+                    (st.session_state.main_df["Attività"].astype(str) == str(c_att))
+                ]
+                if not orig_matches.empty:
+                    orig_index = orig_matches.index[0]
+                    st.info(f"📍 Riga selezionata: **Commessa {c_num} - {c_rdl}**")
+                    if st.button("✏️ Apri & Modifica Scheda Commessa", key="btn_open_editor_attivi", use_container_width=True):
+                        edit_single_row_dialog(row_selected.to_dict(), orig_index)
+
+            st.divider()
             b0, b1, b2 = st.columns([1.5, 1, 1.3])
             with b0:
-                if st.button("💾 Salva Modifiche", key="btn_save_attivi", use_container_width=True):
-                    saved = process_and_save_editor("editor_attivi", view_attivi)
+                if st.button("💾 Salva Modifiche Rapide", key="btn_save_attivi", use_container_width=True):
+                    saved = process_and_save_editor("table_attivi", view_attivi)
                     if saved:
                         st.toast("✅ Modifiche salvate sul database CSV!", icon="💾")
                     else:
@@ -706,19 +801,41 @@ if not df.empty:
     with tab_completati:
         if not df_completati.empty:
             view_comp = df_completati[st.session_state.cols_order].copy()
-            st.data_editor(
+            
+            selection_comp = st.dataframe(
                 view_comp,
-                num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_completati"
+                on_select="rerun",
+                selection_mode="single-row",
+                key="table_completati"
             )
 
+            selected_rows_comp = selection_comp.get("selection", {}).get("rows", [])
+            if selected_rows_comp:
+                selected_idx_comp = selected_rows_comp[0]
+                row_selected_comp = view_comp.iloc[selected_idx_comp]
+                
+                c_num = row_selected_comp["Nr. Commessa"]
+                c_rdl = row_selected_comp["RDL"]
+                c_att = row_selected_comp.get("Attività", "")
+                orig_matches_comp = st.session_state.main_df[
+                    (st.session_state.main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
+                    (st.session_state.main_df["RDL"].astype(str) == str(c_rdl)) & 
+                    (st.session_state.main_df["Attività"].astype(str) == str(c_att))
+                ]
+                if not orig_matches_comp.empty:
+                    orig_index_comp = orig_matches_comp.index[0]
+                    st.info(f"📍 Riga selezionata: **Commessa {c_num} - {c_rdl}**")
+                    if st.button("✏️ Apri & Modifica Scheda Commessa", key="btn_open_editor_comp", use_container_width=True):
+                        edit_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
+
+            st.divider()
             c0, c1, c2 = st.columns([1.5, 1, 1.3])
             with c0:
                 if st.button("💾 Salva Modifiche Archivio", key="btn_save_comp", use_container_width=True):
-                    saved = process_and_save_editor("editor_completati", view_comp)
+                    saved = process_and_save_editor("table_completati", view_comp)
                     if saved:
                         st.toast("✅ Archivio salvato sul database CSV!", icon="💾")
                     else:
