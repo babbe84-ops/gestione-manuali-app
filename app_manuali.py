@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLING AVANZATO: SAAS MINIMAL CLEAN (OPZIONE 1 ESATTA) ---
+# --- STYLING AVANZATO: SAAS MINIMAL CLEAN ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -22,7 +22,6 @@ st.markdown("""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
-    /* Sfondo App */
     .stApp {
         background-color: #f8fafc !important;
     }
@@ -50,7 +49,7 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* KPI Cards SaaS (Bordi Arrotondati + Striscia Colorata) */
+    /* KPI Cards SaaS */
     div[data-testid="stMetric"] {
         background: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
@@ -85,28 +84,6 @@ st.markdown("""
         font-size: 1.9rem !important;
         font-weight: 800 !important;
         color: #0f172a !important;
-    }
-
-    /* Banner Avvisi Scadenze */
-    .saas-alert-danger {
-        background-color: #fef2f2;
-        border: 1px solid #fca5a5;
-        border-radius: 12px;
-        padding: 0.9rem 1.25rem;
-        margin-bottom: 1rem;
-        color: #991b1b;
-        font-weight: 600;
-        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.04);
-    }
-    .saas-alert-warning {
-        background-color: #fffbeb;
-        border: 1px solid #fde68a;
-        border-radius: 12px;
-        padding: 0.9rem 1.25rem;
-        margin-bottom: 1rem;
-        color: #92400e;
-        font-weight: 600;
-        box-shadow: 0 2px 4px rgba(217, 119, 6, 0.04);
     }
 
     /* Data Editor (Tabella Visiva Arrotondata) */
@@ -408,33 +385,6 @@ def show_kpi_details(title, sub_df):
             column_config=dialog_col_config
         )
 
-@st.dialog("🔍 Dettaglio Singola Commessa", width="large")
-def show_single_row_dialog(row_data):
-    st.subheader(f"Commessa: {row_data.get('Nr. Commessa', '')} - {row_data.get('RDL', '')}")
-    df_single = pd.DataFrame([row_data])
-    
-    display_cols = [
-        "Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", 
-        "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", 
-        "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur", "Percorso Cartella", "Note"
-    ]
-    cols_to_show = [c for c in display_cols if c in df_single.columns]
-    
-    dialog_col_config = {
-        "Nuova consegna prevista": st.column_config.DateColumn("Nuova consegna", format="DD/MM/YYYY"),
-        "Modelli 3D dal": st.column_config.DateColumn("Modelli 3D dal", format="DD/MM/YYYY"),
-        "Scadenza Prevista": st.column_config.DateColumn("Scadenza Prevista", format="DD/MM/YYYY"),
-        "Spedizione Wittur": st.column_config.DateColumn("Spedizione Wittur", format="DD/MM/YYYY"),
-        "Data Chiusura": st.column_config.DateColumn("Data Chiusura", format="DD/MM/YYYY"),
-    }
-    
-    st.dataframe(
-        df_single[cols_to_show], 
-        use_container_width=True, 
-        hide_index=True,
-        column_config=dialog_col_config
-    )
-
 @st.dialog("🔄 Ripristina Backup")
 def restore_backup_dialog():
     backup_files = sorted(glob.glob(os.path.join(BACKUP_DIR, "manuali_progetti_db_*.csv")), reverse=True)
@@ -520,7 +470,7 @@ def export_directly_to_target(df_to_export, filename):
     except Exception as e:
         return False, str(e)
 
-# --- HEADER PRINCIPALE ESATTO ---
+# --- HEADER PRINCIPALE ---
 st.markdown("""
 <div class='saas-header'>
     <h1>📚 Gestione Manuali & Commesse</h1>
@@ -598,7 +548,7 @@ if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
 # --- DATAFRAME CORRENTE ---
 df = st.session_state.main_df
 
-# --- ANALISI CRITICITÀ CON BANNER ALLINEATI ALL'IMMAGINE ---
+# --- ANALISI CRITICITÀ CON PULSANTI UNICI / BANNER CLICCABILI ---
 today_ts = date.today()
 if not df.empty:
     progetti_in_ritardo = df[
@@ -617,28 +567,14 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
     c_warn1, c_warn2 = st.columns(2)
     with c_warn1:
         if not progetti_in_ritardo.empty:
-            st.markdown(f"""
-            <div class='saas-alert-danger'>
-                🚨 <b>{len(progetti_in_ritardo)} Attività in Ritardo</b> (Nuova Consegna Prevista superata)
-            </div>
-            """, unsafe_allow_html=True)
-            for idx, row in progetti_in_ritardo.iterrows():
-                scad_val = row['Nuova consegna prevista']
-                scad_str = scad_val.strftime('%d/%m/%Y') if isinstance(scad_val, date) else ""
-                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} (Consegna: {scad_str})"
-                if st.button(btn_label, key=f"btn_rit_{idx}", use_container_width=True):
-                    show_single_row_dialog(row.to_dict())
+            btn_ritardo_label = f"🚨 ATTENZIONE: {len(progetti_in_ritardo)} Commessa/e in Ritardo (Clicca per la tabella completa)"
+            if st.button(btn_ritardo_label, key="btn_open_dialog_ritardi", use_container_width=True):
+                show_kpi_details("🚨 Commesse in Ritardo sulla Nuova Consegna", progetti_in_ritardo)
     with c_warn2:
         if not progetti_urgenti.empty:
-            st.markdown(f"""
-            <div class='saas-alert-warning'>
-                🔥 <b>{len(progetti_urgenti)} Ordini URGENTI</b> in lavorazione
-            </div>
-            """, unsafe_allow_html=True)
-            for idx, row in progetti_urgenti.iterrows():
-                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} ({row['Responsabile']})"
-                if st.button(btn_label, key=f"btn_urg_{idx}", use_container_width=True):
-                    show_single_row_dialog(row.to_dict())
+            btn_urgenti_label = f"🔥 URGENTI: {len(progetti_urgenti)} Ordini in Scadenza (Clicca per la tabella completa)"
+            if st.button(btn_urgenti_label, key="btn_open_dialog_urgenti", use_container_width=True):
+                show_kpi_details("🔥 Ordini e Commesse Urgenti", progetti_urgenti)
 
 # --- KPI METRICS (4 CARD SAAS MINIMAL) ---
 k1, k2, k3, k4 = st.columns(4)
