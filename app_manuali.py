@@ -366,6 +366,71 @@ def edit_single_row_dialog(row_dict, orig_index):
             st.toast("✅ Commessa aggiornata con successo!", icon="💾")
             st.rerun()
 
+# --- DIALOG POPUP PER DUPLICAZIONE / COPIA COMMESSA ---
+@st.dialog("📋 Duplica / Copia Nuova Commessa da Esistente", width="large")
+def duplicate_single_row_dialog(row_dict):
+    st.write(f"Copia dei dati da **Commessa originale: {row_dict.get('Nr. Commessa', '')}**")
+    
+    with st.form("form_duplicate_row_dialog"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nr_commessa = st.text_input("Nuovo Nr. Commessa*", value=f"{row_dict.get('Nr. Commessa', '')}_COPIA")
+            rdl = st.text_input("RDL / Titolo*", value=str(row_dict.get("RDL", "")))
+            descrizione = st.text_input("Descrizione", value=str(row_dict.get("Descrizione", "")))
+            tipo_ord = st.selectbox("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(row_dict.get("Tipo Ordine")) if row_dict.get("Tipo Ordine") in TIPO_ORDINE_OPTIONS else 1)
+            attivita = st.selectbox("Attività", options=ATTIVITA_OPTIONS, index=ATTIVITA_OPTIONS.index(row_dict.get("Attività")) if row_dict.get("Attività") in ATTIVITA_OPTIONS else 0)
+            priorita = st.selectbox("Priorità", options=PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(row_dict.get("Priorità")) if row_dict.get("Priorità") in PRIORITA_OPTIONS else 1)
+            ore_val = st.number_input("Ore Valutate", value=float(row_dict.get("Ore Valutate", 0.0)), step=0.5)
+
+        with col2:
+            resp_curr = [r.strip() for r in str(row_dict.get("Responsabile", "")).split(",") if r.strip() in TECNICI]
+            responsabile_sel = st.multiselect("Responsabili Tecnici", options=TECNICI, default=resp_curr if resp_curr else ["Non ancora assegnato"])
+            stato = st.selectbox("Stato Iniziale", options=["Da iniziare", "In corso", "In revisione", "Completato"], index=0)
+            avanzamento = st.slider("Avanzamento Iniziale (%)", 0, 100, 0)
+            
+            d_3d = safe_parse_date(row_dict.get("Modelli 3D dal")) or date.today()
+            d_scad = safe_parse_date(row_dict.get("Scadenza Prevista")) or date.today()
+            d_nconsegna = safe_parse_date(row_dict.get("Nuova consegna prevista")) or date.today()
+            d_wittur = safe_parse_date(row_dict.get("Spedizione Wittur")) or date.today()
+            
+            modelli_3d_dal = st.date_input("Modelli 3D dal", value=d_3d, format="DD/MM/YYYY")
+            scadenza_prev = st.date_input("Scadenza Prevista", value=d_scad, format="DD/MM/YYYY")
+            nuova_consegna = st.date_input("Nuova Consegna Prevista", value=d_nconsegna, format="DD/MM/YYYY")
+            spedizione_wittur = st.date_input("Spedizione Wittur", value=d_wittur, format="DD/MM/YYYY")
+
+        st.divider()
+        percorso_cartella = st.text_input("Percorso Cartella Locale", value=str(row_dict.get("Percorso Cartella", "")))
+        note = st.text_area("Note / Osservazioni", value=str(row_dict.get("Note", "")))
+        
+        save_dup_btn = st.form_submit_button("➕ Salva come Nuova Commessa Copiata", use_container_width=True)
+        if save_dup_btn and nr_commessa and rdl:
+            new_record = {
+                "Nr. Commessa": nr_commessa.strip(),
+                "RDL": rdl.strip(),
+                "Descrizione": descrizione.strip(),
+                "Tipo Ordine": tipo_ord,
+                "Attività": attivita,
+                "Priorità": priorita,
+                "Ore Valutate": float(ore_val),
+                "Responsabile": ", ".join(responsabile_sel) if responsabile_sel else "Non ancora assegnato",
+                "Stato": stato,
+                "Avanzamento (%)": 100 if stato == "Completato" else avanzamento,
+                "Modelli 3D dal": modelli_3d_dal,
+                "Scadenza Prevista": scadenza_prev,
+                "Nuova consegna prevista": nuova_consegna,
+                "Spedizione Wittur": spedizione_wittur,
+                "Data Chiusura": date.today() if stato == "Completato" else None,
+                "Percorso Cartella": percorso_cartella.strip(),
+                "Note": note.strip()
+            }
+            
+            main_df = pd.concat([st.session_state.main_df, pd.DataFrame([new_record])], ignore_index=True)
+            main_df = auto_update_urgency(main_df)
+            st.session_state.main_df = main_df
+            save_data_to_file(main_df)
+            st.toast(f"✅ Nuova commessa '{nr_commessa}' creata con successo!", icon="📋")
+            st.rerun()
+
 def process_and_save_editor(key_editor, current_view_df):
     editor_state = st.session_state.get(key_editor, {})
     main_df = st.session_state.main_df.copy()
@@ -763,7 +828,6 @@ if not df.empty:
                 selected_idx = selected_rows[0]
                 row_selected = view_attivi.iloc[selected_idx]
                 
-                # Troviamo l'indice originale nel dataframe principale per il salvataggio
                 c_num = row_selected["Nr. Commessa"]
                 c_rdl = row_selected["RDL"]
                 c_att = row_selected.get("Attività", "")
@@ -775,8 +839,14 @@ if not df.empty:
                 if not orig_matches.empty:
                     orig_index = orig_matches.index[0]
                     st.info(f"📍 Riga selezionata: **Commessa {c_num} - {c_rdl}**")
-                    if st.button("✏️ Apri & Modifica Scheda Commessa", key="btn_open_editor_attivi", use_container_width=True):
-                        edit_single_row_dialog(row_selected.to_dict(), orig_index)
+                    
+                    col_action1, col_action2 = st.columns(2)
+                    with col_action1:
+                        if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_attivi", use_container_width=True):
+                            edit_single_row_dialog(row_selected.to_dict(), orig_index)
+                    with col_action2:
+                        if st.button("📋 Duplica / Copia Commessa", key="btn_open_duplicate_attivi", use_container_width=True):
+                            duplicate_single_row_dialog(row_selected.to_dict())
 
             st.divider()
             b0, b1, b2 = st.columns([1.5, 1, 1.3])
@@ -828,8 +898,14 @@ if not df.empty:
                 if not orig_matches_comp.empty:
                     orig_index_comp = orig_matches_comp.index[0]
                     st.info(f"📍 Riga selezionata: **Commessa {c_num} - {c_rdl}**")
-                    if st.button("✏️ Apri & Modifica Scheda Commessa", key="btn_open_editor_comp", use_container_width=True):
-                        edit_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
+                    
+                    col_action_comp1, col_action_comp2 = st.columns(2)
+                    with col_action_comp1:
+                        if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_comp", use_container_width=True):
+                            edit_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
+                    with col_action_comp2:
+                        if st.button("📋 Duplica / Copia Commessa", key="btn_open_duplicate_comp", use_container_width=True):
+                            duplicate_single_row_dialog(row_selected_comp.to_dict())
 
             st.divider()
             c0, c1, c2 = st.columns([1.5, 1, 1.3])
