@@ -144,13 +144,13 @@ def auto_update_urgency(dataframe):
         return dataframe
     for idx, row in dataframe.iterrows():
         prio_curr = str(row.get("Priorità", "")).strip()
-        # Normalizzazione del testo della priorità per evitare incompatibilità
         if prio_curr in ["Urgente", "🚨 Urgente"]:
             dataframe.at[idx, "Priorità"] = "🚨 Urgente"
         elif prio_curr not in PRIORITA_OPTIONS:
             dataframe.at[idx, "Priorità"] = "Normale"
 
         if row.get("Stato") != "Completato":
+            # Usiamo 'Nuova consegna prevista' per determinare l'urgenza
             d_consegna = safe_parse_date(row.get("Nuova consegna prevista"))
             if d_consegna and (d_consegna - today).days <= 14:
                 dataframe.at[idx, "Priorità"] = "🚨 Urgente"
@@ -476,11 +476,17 @@ if st.sidebar.button("🔄 Ripristina Backup", use_container_width=True):
 # --- DATAFRAME CORRENTE ---
 df = st.session_state.main_df
 
-# --- ANALISI CRITICITÀ CON AVVISI CLICCABILI ---
+# --- ANALISI CRITICITÀ CON AVVISI CLICCABILI (RIFERITI A 'Nuova consegna prevista') ---
 today_ts = date.today()
 if not df.empty:
-    progetti_in_ritardo = df[(df["Stato"] != "Completato") & (df["Scadenza Prevista"].apply(lambda x: isinstance(x, date) and x < today_ts))]
-    progetti_urgenti = df[(df["Stato"] != "Completato") & (df["Priorità"].str.contains("Urgente", case=False, na=False))]
+    progetti_in_ritardo = df[
+        (df["Stato"] != "Completato") & 
+        (df["Nuova consegna prevista"].apply(lambda x: isinstance(x, date) and x < today_ts))
+    ]
+    progetti_urgenti = df[
+        (df["Stato"] != "Completato") & 
+        (df["Priorità"].str.contains("Urgente", case=False, na=False))
+    ]
 else:
     progetti_in_ritardo = pd.DataFrame()
     progetti_urgenti = pd.DataFrame()
@@ -491,9 +497,9 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
         if not progetti_in_ritardo.empty:
             st.error(f"🚨 **{len(progetti_in_ritardo)} Attività in Ritardo** (Clicca per visualizzare)")
             for idx, row in progetti_in_ritardo.iterrows():
-                scad_val = row['Scadenza Prevista']
+                scad_val = row['Nuova consegna prevista']
                 scad_str = scad_val.strftime('%d/%m/%Y') if isinstance(scad_val, date) else ""
-                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} (Scaduta: {scad_str})"
+                btn_label = f"• {row['Nr. Commessa']} - {row['RDL']} (Consegna Scaduta: {scad_str})"
                 if st.button(btn_label, key=f"btn_rit_{idx}", use_container_width=True):
                     show_single_row_dialog(row.to_dict())
     with c_warn2:
