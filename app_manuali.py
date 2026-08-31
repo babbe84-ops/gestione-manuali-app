@@ -95,7 +95,7 @@ st.markdown("""
         color: #00a3e0 !important;
     }
 
-    /* Styling Tabelle / Dataframes */
+    /* Styling Tabelle DataEditor */
     div[data-testid="stDataEditor"], div[data-testid="stDataFrame"] {
         background-color: #ffffff !important;
         border-radius: 12px !important;
@@ -366,7 +366,7 @@ def edit_single_row_dialog(row_dict, orig_index):
             st.toast("✅ Commessa aggiornata con successo!", icon="💾")
             st.rerun()
 
-# --- DIALOG POPUP PER DUPLICAZIONE / COPIA COMMESSA ---
+# --- DIALOG POPUP PER DUPLICAZIONE ---
 @st.dialog("📋 Duplica / Copia Nuova Commessa da Esistente", width="large")
 def duplicate_single_row_dialog(row_dict):
     st.write(f"Copia dei dati da **Commessa originale: {row_dict.get('Nr. Commessa', '')}**")
@@ -429,6 +429,25 @@ def duplicate_single_row_dialog(row_dict):
             st.session_state.main_df = main_df
             save_data_to_file(main_df)
             st.toast(f"✅ Nuova commessa '{nr_commessa}' creata con successo!", icon="📋")
+            st.rerun()
+
+# --- DIALOG POPUP CONFERMA ELIMINAZIONE ---
+@st.dialog("🗑️ Conferma Eliminazione Commessa")
+def delete_single_row_dialog(row_dict, orig_index):
+    st.error(f"⚠️ Sei sicuro di voler eliminare la commessa **{row_dict.get('Nr. Commessa', '')}** ({row_dict.get('RDL', '')})?")
+    st.write("Questa operazione rimuoverà la riga dal database (verrà comunque salvato un backup automatico).")
+    
+    col_confirm, col_cancel = st.columns(2)
+    with col_confirm:
+        if st.button("🔴 Sì, Elimina Definitivamente", type="primary", use_container_width=True):
+            main_df = st.session_state.main_df.drop(index=orig_index).reset_index(drop=True)
+            st.session_state.main_df = main_df
+            save_data_to_file(main_df)
+            st.toast("🗑️ Commessa eliminata con successo!", icon="🗑️")
+            st.rerun()
+            
+    with col_cancel:
+        if st.button("Annulla", use_container_width=True):
             st.rerun()
 
 def process_and_save_editor(key_editor, current_view_df):
@@ -811,22 +830,25 @@ if not df.empty:
         if not df_attivi.empty:
             view_attivi = df_attivi[st.session_state.cols_order].copy()
             
-            # Tabella interattiva con selezione riga
-            selection = st.dataframe(
+            # Tabella data_editor per modifica diretta celle + selezione riga
+            edited_attivi = st.data_editor(
                 view_attivi,
+                num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
-                key="table_attivi"
+                key="editor_attivi"
             )
 
-            # Controllo se l'utente ha selezionato una riga
-            selected_rows = selection.get("selection", {}).get("rows", [])
-            if selected_rows:
-                selected_idx = selected_rows[0]
-                row_selected = view_attivi.iloc[selected_idx]
+            # Rilevamento riga per azioni avanzate (Modifica Scheda / Duplica / Elimina)
+            st.write("💡 *Fai doppio clic sulle celle per modificarle direttamente, oppure seleziona una riga sotto per le azioni avanzate:*")
+            
+            row_labels_attivi = [f"Commessa: {row['Nr. Commessa']} | RDL: {row['RDL']} | Attività: {row['Attività']}" for _, row in view_attivi.iterrows()]
+            selected_label_attivi = st.selectbox("🎯 Seleziona riga per opzioni avanzate (Scheda / Duplica / Elimina):", options=["-- Nessuna riga selezionata --"] + row_labels_attivi, key="sb_attivi")
+            
+            if selected_label_attivi != "-- Nessuna riga selezionata --":
+                sel_index = row_labels_attivi.index(selected_label_attivi)
+                row_selected = view_attivi.iloc[sel_index]
                 
                 c_num = row_selected["Nr. Commessa"]
                 c_rdl = row_selected["RDL"]
@@ -838,25 +860,27 @@ if not df.empty:
                 ]
                 if not orig_matches.empty:
                     orig_index = orig_matches.index[0]
-                    st.info(f"📍 Riga selezionata: **Commessa {c_num} - {c_rdl}**")
                     
-                    col_action1, col_action2 = st.columns(2)
+                    col_action1, col_action2, col_action3 = st.columns(3)
                     with col_action1:
                         if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_attivi", use_container_width=True):
                             edit_single_row_dialog(row_selected.to_dict(), orig_index)
                     with col_action2:
                         if st.button("📋 Duplica / Copia Commessa", key="btn_open_duplicate_attivi", use_container_width=True):
                             duplicate_single_row_dialog(row_selected.to_dict())
+                    with col_action3:
+                        if st.button("🗑️ Elimina Commessa", key="btn_open_delete_attivi", use_container_width=True):
+                            delete_single_row_dialog(row_selected.to_dict(), orig_index)
 
             st.divider()
             b0, b1, b2 = st.columns([1.5, 1, 1.3])
             with b0:
-                if st.button("💾 Salva Modifiche Rapide", key="btn_save_attivi", use_container_width=True):
-                    saved = process_and_save_editor("table_attivi", view_attivi)
+                if st.button("💾 Salva Modifiche Rapide Celle", key="btn_save_attivi", use_container_width=True):
+                    saved = process_and_save_editor("editor_attivi", view_attivi)
                     if saved:
-                        st.toast("✅ Modifiche salvate sul database CSV!", icon="💾")
+                        st.toast("✅ Modifiche celle salvate sul database CSV!", icon="💾")
                     else:
-                        st.toast("ℹ️ Nessuna modifica rilevata.", icon="ℹ️")
+                        st.toast("ℹ️ Nessuna modifica celle rilevata.", icon="ℹ️")
                     st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
@@ -872,20 +896,23 @@ if not df.empty:
         if not df_completati.empty:
             view_comp = df_completati[st.session_state.cols_order].copy()
             
-            selection_comp = st.dataframe(
+            edited_comp = st.data_editor(
                 view_comp,
+                num_rows="dynamic",
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
-                key="table_completati"
+                key="editor_completati"
             )
 
-            selected_rows_comp = selection_comp.get("selection", {}).get("rows", [])
-            if selected_rows_comp:
-                selected_idx_comp = selected_rows_comp[0]
-                row_selected_comp = view_comp.iloc[selected_idx_comp]
+            st.write("💡 *Fai doppio clic sulle celle per modificarle direttamente, oppure seleziona una riga sotto per le azioni avanzate:*")
+            
+            row_labels_comp = [f"Commessa: {row['Nr. Commessa']} | RDL: {row['RDL']} | Attività: {row['Attività']}" for _, row in view_comp.iterrows()]
+            selected_label_comp = st.selectbox("🎯 Seleziona riga per opzioni avanzate (Scheda / Duplica / Elimina):", options=["-- Nessuna riga selezionata --"] + row_labels_comp, key="sb_comp")
+
+            if selected_label_comp != "-- Nessuna riga selezionata --":
+                sel_index_comp = row_labels_comp.index(selected_label_comp)
+                row_selected_comp = view_comp.iloc[sel_index_comp]
                 
                 c_num = row_selected_comp["Nr. Commessa"]
                 c_rdl = row_selected_comp["RDL"]
@@ -897,25 +924,27 @@ if not df.empty:
                 ]
                 if not orig_matches_comp.empty:
                     orig_index_comp = orig_matches_comp.index[0]
-                    st.info(f"📍 Riga selezionata: **Commessa {c_num} - {c_rdl}**")
                     
-                    col_action_comp1, col_action_comp2 = st.columns(2)
+                    col_action_comp1, col_action_comp2, col_action_comp3 = st.columns(3)
                     with col_action_comp1:
                         if st.button("✏️ Apri & Modifica Scheda", key="btn_open_editor_comp", use_container_width=True):
                             edit_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
                     with col_action_comp2:
                         if st.button("📋 Duplica / Copia Commessa", key="btn_open_duplicate_comp", use_container_width=True):
                             duplicate_single_row_dialog(row_selected_comp.to_dict())
+                    with col_action_comp3:
+                        if st.button("🗑️ Elimina Commessa", key="btn_open_delete_comp", use_container_width=True):
+                            delete_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
 
             st.divider()
             c0, c1, c2 = st.columns([1.5, 1, 1.3])
             with c0:
-                if st.button("💾 Salva Modifiche Archivio", key="btn_save_comp", use_container_width=True):
-                    saved = process_and_save_editor("table_completati", view_comp)
+                if st.button("💾 Salva Modifiche Rapide Celle Archivio", key="btn_save_comp", use_container_width=True):
+                    saved = process_and_save_editor("editor_completati", view_comp)
                     if saved:
-                        st.toast("✅ Archivio salvato sul database CSV!", icon="💾")
+                        st.toast("✅ Modifiche celle salvate sul database CSV!", icon="💾")
                     else:
-                        st.toast("ℹ️ Nessuna modifica rilevata.", icon="ℹ️")
+                        st.toast("ℹ️ Nessuna modifica celle rilevata.", icon="ℹ️")
                     st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
