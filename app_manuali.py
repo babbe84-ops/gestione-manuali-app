@@ -296,6 +296,51 @@ def save_data_to_file(df_to_save):
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
+# --- SALVATAGGIO DIRETTO DA EDITED DATAFRAME ---
+def save_direct_cell_edits(edited_df, original_view_df):
+    main_df = st.session_state.main_df.copy()
+    
+    # Rimuoviamo la colonna "Seleziona" se presente
+    clean_edited = edited_df.drop(columns=["Seleziona"], errors="ignore")
+    
+    for row_idx, edited_row in clean_edited.iterrows():
+        c_num = edited_row["Nr. Commessa"]
+        c_rdl = edited_row["RDL"]
+        c_att = edited_row.get("Attività", "")
+        
+        # Troviamo la riga corrispondente nel database principale
+        matches = main_df[
+            (main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
+            (main_df["RDL"].astype(str) == str(c_rdl)) & 
+            (main_df["Attività"].astype(str) == str(c_att))
+        ]
+        
+        if not matches.empty:
+            orig_idx = matches.index[0]
+            for col in ALL_COLUMNS:
+                if col in edited_row:
+                    val = edited_row[col]
+                    if col in DATE_COLUMNS:
+                        main_df.at[orig_idx, col] = safe_parse_date(val)
+                    elif col == "Ore Valutate":
+                        main_df.at[orig_idx, col] = float(pd.to_numeric(val, errors="coerce") or 0.0)
+                    elif col == "Avanzamento (%)":
+                        main_df.at[orig_idx, col] = int(pd.to_numeric(val, errors="coerce") or 0)
+                    elif col == "Stato":
+                        old_st = main_df.at[orig_idx, "Stato"]
+                        main_df.at[orig_idx, col] = str(val)
+                        if val == "Completato" and old_st != "Completato":
+                            main_df.at[orig_idx, "Avanzamento (%)"] = 100
+                            main_df.at[orig_idx, "Data Chiusura"] = date.today()
+                        elif val != "Completato":
+                            main_df.at[orig_idx, "Data Chiusura"] = None
+                    else:
+                        main_df.at[orig_idx, col] = str(val) if pd.notnull(val) else ""
+
+    main_df = auto_update_urgency(main_df)
+    st.session_state.main_df = main_df
+    save_data_to_file(main_df)
+
 # --- DIALOG POPUP PER EDITING SCHEDA SINGOLA ---
 @st.dialog("✏️ Scheda Dettaglio & Modifica Commessa", width="large")
 def edit_single_row_dialog(row_dict, orig_index):
@@ -449,77 +494,6 @@ def delete_single_row_dialog(row_dict, orig_index):
     with col_cancel:
         if st.button("Annulla", use_container_width=True):
             st.rerun()
-
-def process_and_save_editor(key_editor, current_view_df):
-    editor_state = st.session_state.get(key_editor, {})
-    main_df = st.session_state.main_df.copy()
-    has_changes = False
-
-    deleted_positions = editor_state.get("deleted_rows", [])
-    if deleted_positions:
-        for pos in deleted_positions:
-            target_row = current_view_df.iloc[pos]
-            c_num = target_row["Nr. Commessa"]
-            c_rdl = target_row["RDL"]
-            c_att = target_row.get("Attività", "")
-            
-            mask = (main_df["Nr. Commessa"].astype(str) == str(c_num)) & \
-                   (main_df["RDL"].astype(str) == str(c_rdl)) & \
-                   (main_df["Attività"].astype(str) == str(c_att))
-            main_df = main_df[~mask]
-            has_changes = True
-
-    edited_rows = editor_state.get("edited_rows", {})
-    if edited_rows:
-        for pos_str, changes in edited_rows.items():
-            pos = int(pos_str) if isinstance(pos_str, str) else pos_str
-            target_row = current_view_df.iloc[pos]
-            c_num = target_row["Nr. Commessa"]
-            c_rdl = target_row["RDL"]
-            c_att = target_row.get("Attività", "")
-
-            matches = main_df[(main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
-                              (main_df["RDL"].astype(str) == str(c_rdl)) & 
-                              (main_df["Attività"].astype(str) == str(c_att))]
-            
-            if not matches.empty:
-                orig_idx = matches.index[0]
-                for col_name, new_val in changes.items():
-                    if col_name == "Seleziona":
-                        continue
-                    elif col_name in DATE_COLUMNS:
-                        main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
-                    elif col_name == "Ore Valutate":
-                        main_df.at[orig_idx, col_name] = float(pd.to_numeric(new_val, errors="coerce") or 0.0)
-                    elif col_name == "Avanzamento (%)":
-                        main_df.at[orig_idx, col_name] = int(pd.to_numeric(new_val, errors="coerce") or 0)
-                    elif col_name == "Stato":
-                        old_st = main_df.at[orig_idx, "Stato"]
-                        main_df.at[orig_idx, col_name] = str(new_val)
-                        if new_val == "Completato" and old_st != "Completato":
-                            main_df.at[orig_idx, "Avanzamento (%)"] = 100
-                            main_df.at[orig_idx, "Data Chiusura"] = date.today()
-                        elif new_val != "Completato":
-                            main_df.at[orig_idx, "Data Chiusura"] = None
-                    else:
-                        main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
-                has_changes = True
-
-    added_rows = editor_state.get("added_rows", [])
-    if added_rows:
-        new_records = []
-        for a_row in added_rows:
-            rec = {col: a_row.get(col, "") for col in ALL_COLUMNS}
-            new_records.append(rec)
-        main_df = pd.concat([main_df, pd.DataFrame(new_records)], ignore_index=True)
-        has_changes = True
-
-    if has_changes:
-        main_df = auto_update_urgency(main_df)
-        st.session_state.main_df = main_df
-        save_data_to_file(main_df)
-        return True
-    return False
 
 @st.dialog("📊 Dettaglio Attività", width="large")
 def show_kpi_details(title, sub_df):
@@ -782,7 +756,6 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
-# Configurazione Colonne con Checkbox "📌" posizionata come prima colonna
 col_config = {
     "Seleziona": st.column_config.CheckboxColumn("📌", default=False),
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
@@ -844,7 +817,7 @@ if not df.empty:
                 key="editor_attivi"
             )
 
-            # Rilevamento spunta della prima colonna "Seleziona"
+            # Rilevamento spunta prima colonna "Seleziona"
             selected_rows = edited_attivi[edited_attivi["Seleziona"] == True]
             if not selected_rows.empty:
                 row_selected = selected_rows.iloc[0]
@@ -874,11 +847,8 @@ if not df.empty:
             b0, b1, b2 = st.columns([1.5, 1, 1.3])
             with b0:
                 if st.button("💾 Salva Modifiche Rapide Celle", key="btn_save_attivi", use_container_width=True):
-                    saved = process_and_save_editor("editor_attivi", view_attivi)
-                    if saved:
-                        st.toast("✅ Modifiche celle salvate sul database CSV!", icon="💾")
-                    else:
-                        st.toast("ℹ️ Nessuna modifica celle rilevata.", icon="ℹ️")
+                    save_direct_cell_edits(edited_attivi, view_attivi)
+                    st.toast("✅ Modifiche celle salvate con successo!", icon="💾")
                     st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
@@ -932,11 +902,8 @@ if not df.empty:
             c0, c1, c2 = st.columns([1.5, 1, 1.3])
             with c0:
                 if st.button("💾 Salva Modifiche Rapide Celle Archivio", key="btn_save_comp", use_container_width=True):
-                    saved = process_and_save_editor("editor_completati", view_comp)
-                    if saved:
-                        st.toast("✅ Modifiche celle salvate sul database CSV!", icon="💾")
-                    else:
-                        st.toast("ℹ️ Nessuna modifica celle rilevata.", icon="ℹ️")
+                    save_direct_cell_edits(edited_comp, view_comp)
+                    st.toast("✅ Modifiche celle salvate con successo!", icon="💾")
                     st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
