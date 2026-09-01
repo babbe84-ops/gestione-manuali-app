@@ -296,17 +296,18 @@ def save_data_to_file(df_to_save):
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
-# --- CALLBACK PER SALVATAGGIO ISTANTANEO E SICURO DI OGNI SINGOLA MODIFICA IN TABELLA ---
-def handle_editor_change(key_editor, current_view_df):
+# --- FUNZIONE SALVATAGGIO MANUALE TABELLA SU FILE CSV ---
+def save_editor_changes_to_csv(key_editor, current_view_df):
     editor_state = st.session_state.get(key_editor, {})
     edited_rows = editor_state.get("edited_rows", {})
+    
     if not edited_rows:
-        return
+        return False
 
     main_df = st.session_state.main_df.copy()
-    has_updated = False
+    has_changes = False
 
-    for pos_str, row_changes in edited_rows.items():
+    for pos_str, changes in edited_rows.items():
         pos = int(pos_str)
         if pos < len(current_view_df):
             target_row = current_view_df.iloc[pos]
@@ -322,7 +323,7 @@ def handle_editor_change(key_editor, current_view_df):
 
             if not matches.empty:
                 orig_idx = matches.index[0]
-                for col_name, new_val in row_changes.items():
+                for col_name, new_val in changes.items():
                     if col_name == "Seleziona":
                         continue
                     elif col_name in DATE_COLUMNS:
@@ -341,15 +342,16 @@ def handle_editor_change(key_editor, current_view_df):
                             main_df.at[orig_idx, "Data Chiusura"] = None
                     else:
                         main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
-                has_updated = True
+                has_changes = True
 
-    if has_updated:
+    if has_changes:
         main_df = auto_update_urgency(main_df)
         st.session_state.main_df = main_df
         save_data_to_file(main_df)
-        st.toast("⚡ Modifica salvata sul file CSV!", icon="💾")
+        return True
+    return False
 
-# --- DIALOG POPUP PER EDITING SCHEDA SINGOLA ---
+# --- DIALOG POPUP PER EDITING SCHEDA SINGOLA (SALVATAGGIO PERMANENTE GARANTITO) ---
 @st.dialog("✏️ Scheda Dettaglio & Modifica Commessa", width="large")
 def edit_single_row_dialog(row_dict, orig_index):
     st.write(f"Modifica dettagliata per **Commessa: {row_dict.get('Nr. Commessa', '')}** | **RDL: {row_dict.get('RDL', '')}**")
@@ -415,7 +417,7 @@ def edit_single_row_dialog(row_dict, orig_index):
             
             st.session_state.main_df = auto_update_urgency(main_df)
             save_data_to_file(st.session_state.main_df)
-            st.toast("✅ Commessa aggiornata con successo!", icon="💾")
+            st.toast("✅ Commessa salvata permanentemente sul CSV!", icon="💾")
             st.rerun()
 
 # --- DIALOG POPUP PER DUPLICAZIONE ---
@@ -820,9 +822,7 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_attivi",
-                on_change=handle_editor_change,
-                args=("editor_attivi", view_attivi)
+                key="editor_attivi"
             )
 
             # Rilevamento spunta prima colonna "Seleziona"
@@ -852,7 +852,15 @@ if not df.empty:
                             delete_single_row_dialog(row_selected.to_dict(), orig_index)
 
             st.divider()
-            b1, b2 = st.columns(2)
+            b0, b1, b2 = st.columns([1.5, 1, 1.3])
+            with b0:
+                if st.button("💾 Salva Modifiche Rapide Celle", key="btn_save_attivi", use_container_width=True):
+                    saved = save_editor_changes_to_csv("editor_attivi", view_attivi)
+                    if saved:
+                        st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                    else:
+                        st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
+                    st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
                 st.download_button("📥 Scarica Excel", data=excel_data_attivi, file_name=f"Attivita_In_Corso_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
@@ -873,9 +881,7 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_completati",
-                on_change=handle_editor_change,
-                args=("editor_completati", view_comp)
+                key="editor_completati"
             )
 
             selected_rows_comp = edited_comp[edited_comp["Seleziona"] == True]
@@ -904,7 +910,15 @@ if not df.empty:
                             delete_single_row_dialog(row_selected_comp.to_dict(), orig_index_comp)
 
             st.divider()
-            c1, c2 = st.columns(2)
+            c0, c1, c2 = st.columns([1.5, 1, 1.3])
+            with c0:
+                if st.button("💾 Salva Modifiche Rapide Celle Archivio", key="btn_save_comp", use_container_width=True):
+                    saved = save_editor_changes_to_csv("editor_completati", view_comp)
+                    if saved:
+                        st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                    else:
+                        st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
+                    st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
                 st.download_button("📥 Scarica Excel", data=excel_data_comp, file_name=f"Archivio_Completati_{date.today().strftime('%d_%m_%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
