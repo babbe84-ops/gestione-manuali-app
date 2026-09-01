@@ -296,15 +296,17 @@ def save_data_to_file(df_to_save):
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
-# --- AGGIORNA IN MEMORIA SESSIONE SENZA SCRIVERE SU FILE ---
-def sync_edits_to_session_state(key_editor, current_view_df):
+# --- NUOVA FUNZIONE DI SALVATAGGIO REALE SUL FILE CSV ---
+def save_editor_changes_to_csv(key_editor, current_view_df):
     editor_state = st.session_state.get(key_editor, {})
     edited_rows = editor_state.get("edited_rows", {})
+    
     if not edited_rows:
-        return
+        return False
 
     main_df = st.session_state.main_df.copy()
-    
+    has_changes = False
+
     for pos_str, changes in edited_rows.items():
         pos = int(pos_str)
         if pos < len(current_view_df):
@@ -340,8 +342,14 @@ def sync_edits_to_session_state(key_editor, current_view_df):
                             main_df.at[orig_idx, "Data Chiusura"] = None
                     else:
                         main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
+                has_changes = True
 
-    st.session_state.main_df = main_df
+    if has_changes:
+        main_df = auto_update_urgency(main_df)
+        st.session_state.main_df = main_df
+        save_data_to_file(main_df)
+        return True
+    return False
 
 # --- DIALOG POPUP PER EDITING SCHEDA SINGOLA ---
 @st.dialog("✏️ Scheda Dettaglio & Modifica Commessa", width="large")
@@ -814,9 +822,7 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_attivi",
-                on_change=sync_edits_to_session_state,
-                args=("editor_attivi", view_attivi)
+                key="editor_attivi"
             )
 
             # Rilevamento spunta prima colonna "Seleziona"
@@ -849,8 +855,11 @@ if not df.empty:
             b0, b1, b2 = st.columns([1.5, 1, 1.3])
             with b0:
                 if st.button("💾 Salva Modifiche Rapide Celle", key="btn_save_attivi", use_container_width=True):
-                    save_data_to_file(st.session_state.main_df)
-                    st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                    saved = save_editor_changes_to_csv("editor_attivi", view_attivi)
+                    if saved:
+                        st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                    else:
+                        st.toast("ℹ️ Nessuna modifica da salvare o già salvata.", icon="ℹ️")
                     st.rerun()
             with b1:
                 excel_data_attivi = convert_df_to_excel(df_attivi)
@@ -872,9 +881,7 @@ if not df.empty:
                 use_container_width=True,
                 column_config=col_config,
                 hide_index=True,
-                key="editor_completati",
-                on_change=sync_edits_to_session_state,
-                args=("editor_completati", view_comp)
+                key="editor_completati"
             )
 
             selected_rows_comp = edited_comp[edited_comp["Seleziona"] == True]
@@ -906,8 +913,11 @@ if not df.empty:
             c0, c1, c2 = st.columns([1.5, 1, 1.3])
             with c0:
                 if st.button("💾 Salva Modifiche Rapide Celle Archivio", key="btn_save_comp", use_container_width=True):
-                    save_data_to_file(st.session_state.main_df)
-                    st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                    saved = save_editor_changes_to_csv("editor_completati", view_comp)
+                    if saved:
+                        st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                    else:
+                        st.toast("ℹ️ Nessuna modifica da salvare o già salvata.", icon="ℹ️")
                     st.rerun()
             with c1:
                 excel_data_comp = convert_df_to_excel(df_completati)
