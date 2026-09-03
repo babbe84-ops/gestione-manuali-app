@@ -296,53 +296,78 @@ def save_data_to_file(df_to_save):
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
-# --- FUNZIONE SALVATAGGIO MANUALE TABELLA SU FILE CSV ---
+# --- FUNZIONE SALVATAGGIO MANUALE TABELLA (MODIFICHE + ELIMINAZIONI) SU CSV ---
 def save_editor_changes_to_csv(key_editor, current_view_df):
     editor_state = st.session_state.get(key_editor, {})
     edited_rows = editor_state.get("edited_rows", {})
+    deleted_rows = editor_state.get("deleted_rows", [])
     
-    if not edited_rows:
+    if not edited_rows and not deleted_rows:
         return False
 
     main_df = st.session_state.main_df.copy()
     has_changes = False
 
-    for pos_str, changes in edited_rows.items():
-        pos = int(pos_str)
-        if pos < len(current_view_df):
-            target_row = current_view_df.iloc[pos]
-            c_num = target_row["Nr. Commessa"]
-            c_rdl = target_row["RDL"]
-            c_att = target_row.get("Attività", "")
+    # 1. Gestione CANCELLAZIONE righe eliminate in tabella
+    if deleted_rows:
+        indices_to_drop = []
+        for pos in deleted_rows:
+            if pos < len(current_view_df):
+                target_row = current_view_df.iloc[pos]
+                c_num = target_row["Nr. Commessa"]
+                c_rdl = target_row["RDL"]
+                c_att = target_row.get("Attività", "")
 
-            matches = main_df[
-                (main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
-                (main_df["RDL"].astype(str) == str(c_rdl)) & 
-                (main_df["Attività"].astype(str) == str(c_att))
-            ]
+                matches = main_df[
+                    (main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
+                    (main_df["RDL"].astype(str) == str(c_rdl)) & 
+                    (main_df["Attività"].astype(str) == str(c_att))
+                ]
+                if not matches.empty:
+                    indices_to_drop.append(matches.index[0])
+        
+        if indices_to_drop:
+            main_df = main_df.drop(index=indices_to_drop).reset_index(drop=True)
+            has_changes = True
 
-            if not matches.empty:
-                orig_idx = matches.index[0]
-                for col_name, new_val in changes.items():
-                    if col_name == "Seleziona":
-                        continue
-                    elif col_name in DATE_COLUMNS:
-                        main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
-                    elif col_name == "Ore Valutate":
-                        main_df.at[orig_idx, col_name] = float(pd.to_numeric(new_val, errors="coerce") or 0.0)
-                    elif col_name == "Avanzamento (%)":
-                        main_df.at[orig_idx, col_name] = int(pd.to_numeric(new_val, errors="coerce") or 0)
-                    elif col_name == "Stato":
-                        old_st = main_df.at[orig_idx, "Stato"]
-                        main_df.at[orig_idx, col_name] = str(new_val)
-                        if new_val == "Completato" and old_st != "Completato":
-                            main_df.at[orig_idx, "Avanzamento (%)"] = 100
-                            main_df.at[orig_idx, "Data Chiusura"] = date.today()
-                        elif new_val != "Completato":
-                            main_df.at[orig_idx, "Data Chiusura"] = None
-                    else:
-                        main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
-                has_changes = True
+    # 2. Gestione MODIFICHE celle
+    if edited_rows:
+        for pos_str, changes in edited_rows.items():
+            pos = int(pos_str)
+            if pos < len(current_view_df):
+                target_row = current_view_df.iloc[pos]
+                c_num = target_row["Nr. Commessa"]
+                c_rdl = target_row["RDL"]
+                c_att = target_row.get("Attività", "")
+
+                matches = main_df[
+                    (main_df["Nr. Commessa"].astype(str) == str(c_num)) & 
+                    (main_df["RDL"].astype(str) == str(c_rdl)) & 
+                    (main_df["Attività"].astype(str) == str(c_att))
+                ]
+
+                if not matches.empty:
+                    orig_idx = matches.index[0]
+                    for col_name, new_val in changes.items():
+                        if col_name == "Seleziona":
+                            continue
+                        elif col_name in DATE_COLUMNS:
+                            main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
+                        elif col_name == "Ore Valutate":
+                            main_df.at[orig_idx, col_name] = float(pd.to_numeric(new_val, errors="coerce") or 0.0)
+                        elif col_name == "Avanzamento (%)":
+                            main_df.at[orig_idx, col_name] = int(pd.to_numeric(new_val, errors="coerce") or 0)
+                        elif col_name == "Stato":
+                            old_st = main_df.at[orig_idx, "Stato"]
+                            main_df.at[orig_idx, col_name] = str(new_val)
+                            if new_val == "Completato" and old_st != "Completato":
+                                main_df.at[orig_idx, "Avanzamento (%)"] = 100
+                                main_df.at[orig_idx, "Data Chiusura"] = date.today()
+                            elif new_val != "Completato":
+                                main_df.at[orig_idx, "Data Chiusura"] = None
+                        else:
+                            main_df.at[orig_idx, col_name] = str(new_val) if pd.notnull(new_val) else ""
+                    has_changes = True
 
     if has_changes:
         main_df = auto_update_urgency(main_df)
@@ -351,7 +376,7 @@ def save_editor_changes_to_csv(key_editor, current_view_df):
         return True
     return False
 
-# --- DIALOG POPUP PER EDITING SCHEDA SINGOLA (SALVATAGGIO PERMANENTE GARANTITO) ---
+# --- DIALOG POPUP PER EDITING SCHEDA SINGOLA ---
 @st.dialog("✏️ Scheda Dettaglio & Modifica Commessa", width="large")
 def edit_single_row_dialog(row_dict, orig_index):
     st.write(f"Modifica dettagliata per **Commessa: {row_dict.get('Nr. Commessa', '')}** | **RDL: {row_dict.get('RDL', '')}**")
@@ -857,7 +882,7 @@ if not df.empty:
                 if st.button("💾 Salva Modifiche Rapide Celle", key="btn_save_attivi", use_container_width=True):
                     saved = save_editor_changes_to_csv("editor_attivi", view_attivi)
                     if saved:
-                        st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                        st.toast("✅ Modifiche/Eliminazioni salvate con successo sul file CSV!", icon="💾")
                     else:
                         st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
                     st.rerun()
@@ -915,7 +940,7 @@ if not df.empty:
                 if st.button("💾 Salva Modifiche Rapide Celle Archivio", key="btn_save_comp", use_container_width=True):
                     saved = save_editor_changes_to_csv("editor_completati", view_comp)
                     if saved:
-                        st.toast("✅ Modifiche salvate con successo sul file CSV!", icon="💾")
+                        st.toast("✅ Modifiche/Eliminazioni salvate con successo sul file CSV!", icon="💾")
                     else:
                         st.toast("ℹ️ Nessuna modifica da salvare.", icon="ℹ️")
                     st.rerun()
