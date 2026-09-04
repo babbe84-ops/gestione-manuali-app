@@ -227,7 +227,7 @@ if "sort_ascending" not in st.session_state:
     st.session_state.sort_ascending = True
 
 def safe_parse_date(val):
-    if pd.isnull(val) or val == "" or str(val).strip().lower() in ["nan", "none", "nat"]:
+    if pd.isnull(val) or val == "" or str(val).strip().lower() in ["nan", "none", "nat", "non ancora definita"]:
         return None
     if isinstance(val, date) and not isinstance(val, datetime):
         return val
@@ -413,15 +413,15 @@ def edit_single_row_dialog(row_dict, orig_index):
             stato = st.selectbox("Stato", options=["Da iniziare", "In corso", "In revisione", "Completato"], index=["Da iniziare", "In corso", "In revisione", "Completato"].index(row_dict.get("Stato")) if row_dict.get("Stato") in ["Da iniziare", "In corso", "In revisione", "Completato"] else 0)
             avanzamento = st.slider("Avanzamento (%)", 0, 100, int(row_dict.get("Avanzamento (%)", 0)))
             
-            d_3d = safe_parse_date(row_dict.get("Modelli 3D dal")) or date.today()
-            d_scad = safe_parse_date(row_dict.get("Scadenza Prevista")) or date.today()
-            d_nconsegna = safe_parse_date(row_dict.get("Nuova consegna prevista")) or date.today()
-            d_wittur = safe_parse_date(row_dict.get("Spedizione Wittur")) or date.today()
+            d_3d = safe_parse_date(row_dict.get("Modelli 3D dal"))
+            d_scad = safe_parse_date(row_dict.get("Scadenza Prevista"))
+            d_nconsegna = safe_parse_date(row_dict.get("Nuova consegna prevista"))
+            d_wittur = safe_parse_date(row_dict.get("Spedizione Wittur"))
             
-            modelli_3d_dal = st.date_input("Modelli 3D dal", value=d_3d, format="DD/MM/YYYY")
-            scadenza_prev = st.date_input("Scadenza Prevista", value=d_scad, format="DD/MM/YYYY")
-            nuova_consegna = st.date_input("Nuova Consegna Prevista", value=d_nconsegna, format="DD/MM/YYYY")
-            spedizione_wittur = st.date_input("Spedizione Wittur", value=d_wittur, format="DD/MM/YYYY")
+            modelli_3d_dal = st.date_input("Modelli 3D dal (lascia vuoto se non definita)", value=d_3d, format="DD/MM/YYYY")
+            scadenza_prev = st.date_input("Scadenza Prevista (lascia vuoto se non definita)", value=d_scad, format="DD/MM/YYYY")
+            nuova_consegna = st.date_input("Nuova Consegna Prevista (lascia vuoto se non definita)", value=d_nconsegna, format="DD/MM/YYYY")
+            spedizione_wittur = st.date_input("Spedizione Wittur (lascia vuoto se non definita)", value=d_wittur, format="DD/MM/YYYY")
 
         st.divider()
         percorso_cartella = st.text_input("Percorso Cartella Locale", value=str(row_dict.get("Percorso Cartella", "")))
@@ -487,10 +487,10 @@ def duplicate_single_row_dialog(row_dict):
             stato = st.selectbox("Stato Iniziale", options=["Da iniziare", "In corso", "In revisione", "Completato"], index=0)
             avanzamento = st.slider("Avanzamento Iniziale (%)", 0, 100, 0)
             
-            d_3d = safe_parse_date(row_dict.get("Modelli 3D dal")) or date.today()
-            d_scad = safe_parse_date(row_dict.get("Scadenza Prevista")) or date.today()
-            d_nconsegna = safe_parse_date(row_dict.get("Nuova consegna prevista")) or date.today()
-            d_wittur = safe_parse_date(row_dict.get("Spedizione Wittur")) or date.today()
+            d_3d = safe_parse_date(row_dict.get("Modelli 3D dal"))
+            d_scad = safe_parse_date(row_dict.get("Scadenza Prevista"))
+            d_nconsegna = safe_parse_date(row_dict.get("Nuova consegna prevista"))
+            d_wittur = safe_parse_date(row_dict.get("Spedizione Wittur"))
             
             modelli_3d_dal = st.date_input("Modelli 3D dal", value=d_3d, format="DD/MM/YYYY")
             scadenza_prev = st.date_input("Scadenza Prevista", value=d_scad, format="DD/MM/YYYY")
@@ -673,10 +673,12 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
     responsabili_sel = st.multiselect("Tecnici", options=TECNICI, default=["Non ancora assegnato"])
     stato = st.selectbox("Stato Iniziale", ["Da iniziare", "In corso", "In revisione", "Completato"])
     avanzamento = st.slider("Avanzamento (%)", 0, 100, 0, step=5)
-    modelli_3d_dal = st.date_input("Modelli 3D dal", value=date.today(), format="DD/MM/YYYY")
-    scadenza = st.date_input("Scadenza Prevista", value=date.today(), format="DD/MM/YYYY")
-    nuova_consegna = st.date_input("Nuova consegna prevista", value=date.today(), format="DD/MM/YYYY")
-    spedizione_wittur = st.date_input("Spedizione Wittur", value=date.today(), format="DD/MM/YYYY")
+    
+    modelli_3d_dal = st.date_input("Modelli 3D dal (opzionale)", value=None, format="DD/MM/YYYY")
+    scadenza = st.date_input("Scadenza Prevista (opzionale)", value=None, format="DD/MM/YYYY")
+    nuova_consegna = st.date_input("Nuova consegna prevista (opzionale)", value=None, format="DD/MM/YYYY")
+    spedizione_wittur = st.date_input("Spedizione Wittur (opzionale)", value=None, format="DD/MM/YYYY")
+    
     cartella = st.text_input("Percorso Cartella Locale")
     note = st.text_area("Note")
     
@@ -687,7 +689,8 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
         resp_stringa = ", ".join([r for r in responsabili_sel if r]) if responsabili_sel else "Non ancora assegnato"
         tipo_stringa = ", ".join([t for t in tipologie_selezionate if t]) if tipologie_selezionate else ""
         today_val = date.today() if stato == "Completato" else None
-        if stato != "Completato" and (nuova_consegna - date.today()).days <= 14:
+        
+        if stato != "Completato" and nuova_consegna and (nuova_consegna - date.today()).days <= 14:
             priorita = "🚨 Urgente"
 
         new_rows = []
@@ -813,7 +816,6 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
-# Configuration for DataEditor: SelectboxColumn per modifiche dirette dalla tabella
 col_config = {
     "Seleziona": st.column_config.CheckboxColumn("📌", default=False),
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
