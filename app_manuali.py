@@ -232,6 +232,7 @@ if "sort_ascending" not in st.session_state:
     st.session_state.sort_ascending = True
 
 def safe_parse_date(val):
+    """Parsing universale in formato europeo GG/MM/AAAA."""
     if pd.isnull(val) or val == "" or str(val).strip().lower() in ["nan", "none", "nat", "non ancora definita"]:
         return None
     if isinstance(val, date) and not isinstance(val, datetime):
