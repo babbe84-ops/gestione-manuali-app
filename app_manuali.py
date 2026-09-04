@@ -401,7 +401,7 @@ def edit_single_row_dialog(row_dict, orig_index):
             tipo_ord = st.selectbox("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(row_dict.get("Tipo Ordine")) if row_dict.get("Tipo Ordine") in TIPO_ORDINE_OPTIONS else 1)
             
             tipo_curr = [t.strip() for t in str(row_dict.get("Tipologia", "")).split(",") if t.strip() in TIPOLOGIA_OPTIONS]
-            tipologia_sel = st.multiselect("Tipologia (seleziona una o più)", options=TIPOLOGIA_OPTIONS, default=tipo_curr)
+            tipologia_sel = st.multiselect("Tipologia (seleziona una o più opzioni)", options=TIPOLOGIA_OPTIONS, default=tipo_curr)
             
             attivita = st.selectbox("Attività", options=ATTIVITA_OPTIONS, index=ATTIVITA_OPTIONS.index(row_dict.get("Attività")) if row_dict.get("Attività") in ATTIVITA_OPTIONS else 0)
             priorita = st.selectbox("Priorità", options=PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(row_dict.get("Priorità")) if row_dict.get("Priorità") in PRIORITA_OPTIONS else 1)
@@ -418,10 +418,10 @@ def edit_single_row_dialog(row_dict, orig_index):
             d_nconsegna = safe_parse_date(row_dict.get("Nuova consegna prevista"))
             d_wittur = safe_parse_date(row_dict.get("Spedizione Wittur"))
             
-            modelli_3d_dal = st.date_input("Modelli 3D dal (lascia vuoto se non definita)", value=d_3d, format="DD/MM/YYYY")
-            scadenza_prev = st.date_input("Scadenza Prevista (lascia vuoto se non definita)", value=d_scad, format="DD/MM/YYYY")
-            nuova_consegna = st.date_input("Nuova Consegna Prevista (lascia vuoto se non definita)", value=d_nconsegna, format="DD/MM/YYYY")
-            spedizione_wittur = st.date_input("Spedizione Wittur (lascia vuoto se non definita)", value=d_wittur, format="DD/MM/YYYY")
+            modelli_3d_dal = st.date_input("Modelli 3D dal", value=d_3d, format="DD/MM/YYYY")
+            scadenza_prev = st.date_input("Scadenza Prevista", value=d_scad, format="DD/MM/YYYY")
+            nuova_consegna = st.date_input("Nuova Consegna Prevista", value=d_nconsegna, format="DD/MM/YYYY")
+            spedizione_wittur = st.date_input("Spedizione Wittur", value=d_wittur, format="DD/MM/YYYY")
 
         st.divider()
         percorso_cartella = st.text_input("Percorso Cartella Locale", value=str(row_dict.get("Percorso Cartella", "")))
@@ -816,12 +816,13 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
+# Configuration for DataEditor: TextColumn per consentire la visualizzazione e modifica di testo contenente valori multipli
 col_config = {
     "Seleziona": st.column_config.CheckboxColumn("📌", default=False),
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
     "RDL": st.column_config.TextColumn("RDL", pinned=True),
     "Nuova consegna prevista": st.column_config.DateColumn("Nuova Consegna", format="DD/MM/YYYY"),
-    "Tipologia": st.column_config.SelectboxColumn("Tipologia", options=TIPOLOGIA_OPTIONS),
+    "Tipologia": st.column_config.TextColumn("Tipologia"),
     "Descrizione": st.column_config.TextColumn("Descrizione"),
     "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS, required=True),
     "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS, required=True),
