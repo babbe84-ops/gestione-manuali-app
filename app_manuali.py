@@ -372,7 +372,8 @@ def save_editor_changes_to_csv(key_editor, current_view_df):
                             main_df.at[orig_idx, col_name] = str(new_val)
                             if new_val == "Completato" and old_st != "Completato":
                                 main_df.at[orig_idx, "Avanzamento (%)"] = 100
-                                main_df.at[orig_idx, "Data Chiusura"] = date.today()
+                                if not safe_parse_date(main_df.at[orig_idx, "Data Chiusura"]):
+                                    main_df.at[orig_idx, "Data Chiusura"] = date.today()
                             elif new_val != "Completato":
                                 main_df.at[orig_idx, "Data Chiusura"] = None
                         else:
@@ -444,7 +445,8 @@ def edit_single_row_dialog(row_dict, orig_index):
             main_df.at[orig_index, "Stato"] = stato
             if stato == "Completato" and old_st != "Completato":
                 main_df.at[orig_index, "Avanzamento (%)"] = 100
-                main_df.at[orig_index, "Data Chiusura"] = date.today()
+                if not safe_parse_date(main_df.at[orig_index, "Data Chiusura"]):
+                    main_df.at[orig_index, "Data Chiusura"] = date.today()
             elif stato != "Completato":
                 main_df.at[orig_index, "Avanzamento (%)"] = avanzamento
                 main_df.at[orig_index, "Data Chiusura"] = None
@@ -816,7 +818,6 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
-# Configuration for DataEditor: TextColumn per consentire la visualizzazione e modifica di testo contenente valori multipli
 col_config = {
     "Seleziona": st.column_config.CheckboxColumn("📌", default=False),
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
