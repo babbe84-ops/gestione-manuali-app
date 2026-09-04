@@ -131,26 +131,31 @@ st.markdown("""
         box-shadow: 0 3px 8px rgba(0, 163, 224, 0.2) !important;
     }
 
-    /* Tabs Styling Clean */
+    /* Tabs Styling - ALTA VISIBILITÀ */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background-color: transparent;
-        border-bottom: 2px solid #e2e8f0;
-        margin-bottom: 1rem;
+        gap: 8px;
+        background-color: #e2e8f0;
+        padding: 6px;
+        border-radius: 12px;
+        border-bottom: none;
+        margin-bottom: 1.2rem;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 46px;
-        border-radius: 8px 8px 0 0;
-        font-weight: 600;
-        font-size: 0.95rem;
-        color: #64748b;
+        height: 48px;
+        border-radius: 8px;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        color: #475569 !important;
         background-color: transparent;
-        padding: 0 1.25rem;
+        padding: 0 1.5rem;
+        border: none !important;
+        transition: all 0.2s ease;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #0a2540 !important;
-        border-bottom: 3px solid #00a3e0 !important;
+        background-color: #0a2540 !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 10px rgba(10, 37, 64, 0.15);
+        border-bottom: 4px solid #00a3e0 !important;
     }
 
     /* Container Filtri Expander */
@@ -759,12 +764,13 @@ if not progetti_in_ritardo.empty or not progetti_urgenti.empty:
             if st.button(btn_urgenti_label, key="btn_open_dialog_urgenti", use_container_width=True):
                 show_kpi_details("🔥 Ordini e Commesse Urgenti", progetti_urgenti)
 
-# --- KPI METRICS SINTEC ---
-k1, k2, k3, k4 = st.columns(4)
+# --- KPI METRICS SINTEC (5 COLONNE) ---
+k1, k2, k3, k4, k5 = st.columns(5)
 
 df_totale = df.copy() if not df.empty else pd.DataFrame()
 df_prev = df[df["Tipo Ordine"] == "Preventivo"].copy() if not df.empty else pd.DataFrame()
 df_conf = df[df["Tipo Ordine"] == "Confermato"].copy() if not df.empty else pd.DataFrame()
+df_comp_kpi = df[df["Stato"] == "Completato"].copy() if not df.empty else pd.DataFrame()
 df_urg = df[(df["Priorità"].str.contains("Urgente", case=False, na=False)) & (df["Stato"] != "Completato")].copy() if not df.empty else pd.DataFrame()
 
 with k1:
@@ -783,6 +789,11 @@ with k3:
         show_kpi_details("Elenco Ordini Confermati", df_conf)
 
 with k4:
+    st.metric(label="COMPLETATI 🎉", value=len(df_comp_kpi))
+    if st.button("🎉 Apri Completati", key="btn_kpi_comp", use_container_width=True):
+        show_kpi_details("Elenco Commesse Completate", df_comp_kpi)
+
+with k5:
     st.metric(label="URGENTI / SCADUTI 🔥", value=len(df_urg))
     if st.button("🔥 Apri Urgenti", key="btn_kpi_urg", use_container_width=True):
         show_kpi_details("Elenco Attività Urgenti", df_urg)
@@ -815,7 +826,7 @@ if not df.empty:
             sort_order = st.radio("Ordine:", options=["Crescente ⬆️", "Decrescente ⬇️"], horizontal=True)
             st.session_state.sort_ascending = (sort_order == "Crescente ⬆️")
 
-# --- TABELLE PRINCIPALI ---
+# --- TABELLE PRINCIPALI CON TAB AD ALTA VISIBILITÀ ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
 col_config = {
