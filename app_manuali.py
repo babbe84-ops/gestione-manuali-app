@@ -299,6 +299,13 @@ def load_data():
 def save_data_to_file(df_to_save):
     create_automatic_backup()
     df_disk = df_to_save[ALL_COLUMNS].copy()
+    
+    # Se Tipologia è una lista, la convertiamo in stringa per il CSV
+    if "Tipologia" in df_disk.columns:
+        df_disk["Tipologia"] = df_disk["Tipologia"].apply(
+            lambda x: ", ".join(x) if isinstance(x, list) else str(x)
+        )
+        
     for dcol in DATE_COLUMNS:
         df_disk[dcol] = df_disk[dcol].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, (date, datetime)) else "")
     df_disk.to_csv(DB_FILE, index=False)
@@ -306,7 +313,7 @@ def save_data_to_file(df_to_save):
 if "main_df" not in st.session_state:
     st.session_state.main_df = load_data()
 
-# --- FUNZIONE SALVATAGGIO MANUALE TABELLA (MODIFICHE + ELIMINAZIONI) SU CSV ---
+# --- FUNZIONE SALVATAGGIO MANUALE TABELLA SU CSV ---
 def save_editor_changes_to_csv(key_editor, current_view_df):
     editor_state = st.session_state.get(key_editor, {})
     edited_rows = editor_state.get("edited_rows", {})
@@ -318,7 +325,7 @@ def save_editor_changes_to_csv(key_editor, current_view_df):
     main_df = st.session_state.main_df.copy()
     has_changes = False
 
-    # 1. Gestione CANCELLAZIONE righe eliminate in tabella
+    # 1. Gestione CANCELLAZIONE righe
     if deleted_rows:
         indices_to_drop = []
         for pos in deleted_rows:
@@ -361,6 +368,11 @@ def save_editor_changes_to_csv(key_editor, current_view_df):
                     for col_name, new_val in changes.items():
                         if col_name == "Seleziona":
                             continue
+                        elif col_name == "Tipologia":
+                            if isinstance(new_val, list):
+                                main_df.at[orig_idx, col_name] = ", ".join(new_val)
+                            else:
+                                main_df.at[orig_idx, col_name] = str(new_val)
                         elif col_name in DATE_COLUMNS:
                             main_df.at[orig_idx, col_name] = safe_parse_date(new_val)
                         elif col_name == "Ore Valutate":
@@ -400,9 +412,13 @@ def edit_single_row_dialog(row_dict, orig_index):
             
             tipo_ord = st.selectbox("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(row_dict.get("Tipo Ordine")) if row_dict.get("Tipo Ordine") in TIPO_ORDINE_OPTIONS else 1)
             
-            # MULTISELECT TIPOLOGIA
-            tipo_curr = [t.strip() for t in str(row_dict.get("Tipologia", "")).split(",") if t.strip() in TIPOLOGIA_OPTIONS]
-            tipologia_sel = st.multiselect("Tipologia (più scelte)", options=TIPOLOGIA_OPTIONS, default=tipo_curr)
+            raw_tipologia = row_dict.get("Tipologia", "")
+            if isinstance(raw_tipologia, list):
+                tipo_curr = [t.strip() for t in raw_tipologia if t.strip() in TIPOLOGIA_OPTIONS]
+            else:
+                tipo_curr = [t.strip() for t in str(raw_tipologia).split(",") if t.strip() in TIPOLOGIA_OPTIONS]
+                
+            tipologia_sel = st.multiselect("Tipologia (seleziona una o più)", options=TIPOLOGIA_OPTIONS, default=tipo_curr)
             
             attivita = st.selectbox("Attività", options=ATTIVITA_OPTIONS, index=ATTIVITA_OPTIONS.index(row_dict.get("Attività")) if row_dict.get("Attività") in ATTIVITA_OPTIONS else 0)
             priorita = st.selectbox("Priorità", options=PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(row_dict.get("Priorità")) if row_dict.get("Priorità") in PRIORITA_OPTIONS else 1)
@@ -475,7 +491,12 @@ def duplicate_single_row_dialog(row_dict):
             descrizione = st.text_input("Descrizione", value=str(row_dict.get("Descrizione", "")))
             tipo_ord = st.selectbox("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(row_dict.get("Tipo Ordine")) if row_dict.get("Tipo Ordine") in TIPO_ORDINE_OPTIONS else 1)
             
-            tipo_curr = [t.strip() for t in str(row_dict.get("Tipologia", "")).split(",") if t.strip() in TIPOLOGIA_OPTIONS]
+            raw_tipologia = row_dict.get("Tipologia", "")
+            if isinstance(raw_tipologia, list):
+                tipo_curr = [t.strip() for t in raw_tipologia if t.strip() in TIPOLOGIA_OPTIONS]
+            else:
+                tipo_curr = [t.strip() for t in str(raw_tipologia).split(",") if t.strip() in TIPOLOGIA_OPTIONS]
+                
             tipologia_sel = st.multiselect("Tipologia", options=TIPOLOGIA_OPTIONS, default=tipo_curr)
             
             attivita = st.selectbox("Attività", options=ATTIVITA_OPTIONS, index=ATTIVITA_OPTIONS.index(row_dict.get("Attività")) if row_dict.get("Attività") in ATTIVITA_OPTIONS else 0)
@@ -814,12 +835,13 @@ if not df.empty:
 # --- TABELLE PRINCIPALI ---
 tab_operativa, tab_completati, tab_reports = st.tabs(["📋 Attività In Corso", "✅ Archivio Completati", "📊 Reportistica & Analytics"])
 
+# Configuration for DataEditor: ListColumn for multiple items support in table
 col_config = {
     "Seleziona": st.column_config.CheckboxColumn("📌", default=False),
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
     "RDL": st.column_config.TextColumn("RDL", pinned=True),
     "Nuova consegna prevista": st.column_config.DateColumn("Nuova Consegna", format="DD/MM/YYYY"),
-    "Tipologia": st.column_config.TextColumn("Tipologia"),
+    "Tipologia": st.column_config.ListColumn("Tipologia"),
     "Descrizione": st.column_config.TextColumn("Descrizione"),
     "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS, required=True),
     "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS, required=True),
@@ -856,6 +878,13 @@ if not df.empty:
                 ascending=st.session_state.sort_ascending, 
                 na_position='last'
             )
+        
+        # Converte la stringa Tipologia in lista per consentire la corretta visualizzazione multiselect in tabella
+        if "Tipologia" in target_df.columns:
+            target_df["Tipologia"] = target_df["Tipologia"].apply(
+                lambda x: [i.strip() for i in str(x).split(",") if i.strip()] if pd.notnull(x) and str(x).strip() != "" else []
+            )
+
         target_df.insert(0, "Seleziona", False)
         return target_df
 
