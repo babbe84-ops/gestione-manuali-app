@@ -194,13 +194,23 @@ PRIORITA_OPTIONS = [
     "🚨 Urgente"
 ]
 
+TIPOLOGIA_OPTIONS = [
+    "Hydra",
+    "Pegasus",
+    "3600 (tondo sopra)",
+    "3602 (tondo sotto)",
+    "3023 (dritto sotto)",
+    "Taurus",
+    "Altro"
+]
+
 ALL_COLUMNS = [
     "Nr. Commessa", "RDL", "Descrizione", "Tipo Ordine", "Attività", "Priorità", "Ore Valutate", "Responsabile", 
-    "Stato", "Avanzamento (%)", "Modelli 3D dal", "Scadenza Prevista", "Nuova consegna prevista", "Spedizione Wittur", "Data Chiusura", "Percorso Cartella", "Note"
+    "Stato", "Avanzamento (%)", "Modelli 3D dal", "Scadenza Prevista", "Nuova consegna prevista", "Tipologia", "Spedizione Wittur", "Data Chiusura", "Percorso Cartella", "Note"
 ]
 
 DEFAULT_ORDER = [
-    "Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", 
+    "Nr. Commessa", "RDL", "Nuova consegna prevista", "Tipologia", "Descrizione", "Priorità", "Attività", 
     "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", "Avanzamento (%)", "Modelli 3D dal", 
     "Scadenza Prevista", "Spedizione Wittur", "Data Chiusura", "Percorso Cartella", "Note"
 ]
@@ -387,7 +397,13 @@ def edit_single_row_dialog(row_dict, orig_index):
             nr_commessa = st.text_input("Nr. Commessa", value=str(row_dict.get("Nr. Commessa", "")))
             rdl = st.text_input("RDL / Titolo", value=str(row_dict.get("RDL", "")))
             descrizione = st.text_input("Descrizione", value=str(row_dict.get("Descrizione", "")))
+            
             tipo_ord = st.selectbox("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(row_dict.get("Tipo Ordine")) if row_dict.get("Tipo Ordine") in TIPO_ORDINE_OPTIONS else 1)
+            
+            # MULTISELECT TIPOLOGIA
+            tipo_curr = [t.strip() for t in str(row_dict.get("Tipologia", "")).split(",") if t.strip() in TIPOLOGIA_OPTIONS]
+            tipologia_sel = st.multiselect("Tipologia (più scelte)", options=TIPOLOGIA_OPTIONS, default=tipo_curr)
+            
             attivita = st.selectbox("Attività", options=ATTIVITA_OPTIONS, index=ATTIVITA_OPTIONS.index(row_dict.get("Attività")) if row_dict.get("Attività") in ATTIVITA_OPTIONS else 0)
             priorita = st.selectbox("Priorità", options=PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(row_dict.get("Priorità")) if row_dict.get("Priorità") in PRIORITA_OPTIONS else 1)
             ore_val = st.number_input("Ore Valutate", value=float(row_dict.get("Ore Valutate", 0.0)), step=0.5)
@@ -419,6 +435,7 @@ def edit_single_row_dialog(row_dict, orig_index):
             main_df.at[orig_index, "RDL"] = rdl.strip()
             main_df.at[orig_index, "Descrizione"] = descrizione.strip()
             main_df.at[orig_index, "Tipo Ordine"] = tipo_ord
+            main_df.at[orig_index, "Tipologia"] = ", ".join(tipologia_sel) if tipologia_sel else ""
             main_df.at[orig_index, "Attività"] = attivita
             main_df.at[orig_index, "Priorità"] = priorita
             main_df.at[orig_index, "Ore Valutate"] = float(ore_val)
@@ -457,6 +474,10 @@ def duplicate_single_row_dialog(row_dict):
             rdl = st.text_input("RDL / Titolo*", value=str(row_dict.get("RDL", "")))
             descrizione = st.text_input("Descrizione", value=str(row_dict.get("Descrizione", "")))
             tipo_ord = st.selectbox("Tipo Ordine", options=TIPO_ORDINE_OPTIONS, index=TIPO_ORDINE_OPTIONS.index(row_dict.get("Tipo Ordine")) if row_dict.get("Tipo Ordine") in TIPO_ORDINE_OPTIONS else 1)
+            
+            tipo_curr = [t.strip() for t in str(row_dict.get("Tipologia", "")).split(",") if t.strip() in TIPOLOGIA_OPTIONS]
+            tipologia_sel = st.multiselect("Tipologia", options=TIPOLOGIA_OPTIONS, default=tipo_curr)
+            
             attivita = st.selectbox("Attività", options=ATTIVITA_OPTIONS, index=ATTIVITA_OPTIONS.index(row_dict.get("Attività")) if row_dict.get("Attività") in ATTIVITA_OPTIONS else 0)
             priorita = st.selectbox("Priorità", options=PRIORITA_OPTIONS, index=PRIORITA_OPTIONS.index(row_dict.get("Priorità")) if row_dict.get("Priorità") in PRIORITA_OPTIONS else 1)
             ore_val = st.number_input("Ore Valutate", value=float(row_dict.get("Ore Valutate", 0.0)), step=0.5)
@@ -488,6 +509,7 @@ def duplicate_single_row_dialog(row_dict):
                 "RDL": rdl.strip(),
                 "Descrizione": descrizione.strip(),
                 "Tipo Ordine": tipo_ord,
+                "Tipologia": ", ".join(tipologia_sel) if tipologia_sel else "",
                 "Attività": attivita,
                 "Priorità": priorita,
                 "Ore Valutate": float(ore_val),
@@ -535,7 +557,7 @@ def show_kpi_details(title, sub_df):
         st.info("Nessuna attività presente in questa categoria.")
     else:
         display_cols = [
-            "Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", 
+            "Nr. Commessa", "RDL", "Nuova consegna prevista", "Tipologia", "Descrizione", "Priorità", "Attività", 
             "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", 
             "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur", "Note"
         ]
@@ -593,7 +615,7 @@ def restore_backup_dialog():
             st.rerun()
 
 def generate_printable_html(df_to_print, title):
-    cols = ["Nr. Commessa", "RDL", "Nuova consegna prevista", "Descrizione", "Priorità", "Attività", "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur"]
+    cols = ["Nr. Commessa", "RDL", "Nuova consegna prevista", "Tipologia", "Descrizione", "Priorità", "Attività", "Tipo Ordine", "Ore Valutate", "Responsabile", "Stato", "Avanzamento (%)", "Scadenza Prevista", "Spedizione Wittur"]
     df_clean = df_to_print[[c for c in cols if c in df_to_print.columns]].copy()
     for dcol in DATE_COLUMNS:
         if dcol in df_clean.columns:
@@ -645,6 +667,7 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
     rdl_val = st.text_input("RDL / Titolo*")
     descrizione_val = st.text_input("Descrizione Commessa")
     tipo_ordine = st.radio("Tipo Ordine*", TIPO_ORDINE_OPTIONS, index=1, horizontal=True)
+    tipologie_selezionate = st.multiselect("Tipologia (più scelte)", TIPOLOGIA_OPTIONS, default=[])
     attivita_selezionate = st.multiselect("Attività*", options=ATTIVITA_OPTIONS, default=["Installation"])
     priorita = st.selectbox("Priorità*", PRIORITA_OPTIONS, index=1)
     ore_valutate = st.number_input("Ore Valutate", min_value=0.0, step=0.5)
@@ -663,6 +686,7 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
         if not attivita_selezionate:
             attivita_selezionate = ["Altro"]
         resp_stringa = ", ".join([r for r in responsabili_sel if r]) if responsabili_sel else "Non ancora assegnato"
+        tipo_stringa = ", ".join([t for t in tipologie_selezionate if t]) if tipologie_selezionate else ""
         today_val = date.today() if stato == "Completato" else None
         if stato != "Completato" and (nuova_consegna - date.today()).days <= 14:
             priorita = "🚨 Urgente"
@@ -674,6 +698,7 @@ with st.sidebar.form("form_nuovo_progetto", clear_on_submit=True):
                 "RDL": str(rdl_val).strip(),
                 "Descrizione": str(descrizione_val).strip(),
                 "Tipo Ordine": tipo_ordine,
+                "Tipologia": tipo_stringa,
                 "Attività": att,
                 "Priorità": priorita,
                 "Ore Valutate": float(ore_valutate / len(attivita_selezionate) if len(attivita_selezionate) > 1 else ore_valutate),
@@ -794,6 +819,7 @@ col_config = {
     "Nr. Commessa": st.column_config.TextColumn("Nr. Commessa"),
     "RDL": st.column_config.TextColumn("RDL", pinned=True),
     "Nuova consegna prevista": st.column_config.DateColumn("Nuova Consegna", format="DD/MM/YYYY"),
+    "Tipologia": st.column_config.TextColumn("Tipologia"),
     "Descrizione": st.column_config.TextColumn("Descrizione"),
     "Priorità": st.column_config.SelectboxColumn("Priorità", options=PRIORITA_OPTIONS, required=True),
     "Attività": st.column_config.SelectboxColumn("Attività", options=ATTIVITA_OPTIONS, required=True),
